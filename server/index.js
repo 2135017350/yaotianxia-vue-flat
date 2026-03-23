@@ -15,9 +15,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// 允许的前端来源（支持多个，兼容开发模式和生产模式）
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  `http://localhost:${PORT}`,
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5173',
+].filter(Boolean)
+
 // 中间件
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // 允许无 origin 的请求（如 curl、Postman）或在白名单内的来源
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error(`CORS 不允许来自 ${origin} 的请求`))
+    }
+  },
   credentials: true,
 }))
 app.use(express.json())
@@ -51,10 +67,9 @@ app.get('/{*splat}', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n🚀 药天下后端服务已启动`)
   console.log(`   API 地址: http://localhost:${PORT}/api`)
-  console.log(`   前端地址: ${process.env.FRONTEND_URL || `http://localhost:${PORT}`}`)
+  console.log(`   前端地址: http://localhost:${PORT}`)
+  console.log(`   允许跨域: ${allowedOrigins.join(', ')}`)
   console.log(`\n📋 使用说明：`)
-  console.log(`   1. 确保 MySQL 已启动并创建数据库 yaotianxia`)
-  console.log(`   2. 执行 server/init.sql 初始化数据库表`)
-  console.log(`   3. 修改 .env 文件中的数据库连接信息`)
-  console.log(`   4. 运行 pnpm build 构建前端，再运行 node server/index.js`)
+  console.log(`   开发模式: pnpm dev（前端 3001）+ node server/index.js（后端 3000）`)
+  console.log(`   生产模式: pnpm build && node server/index.js`)
 })

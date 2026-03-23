@@ -432,7 +432,7 @@ const tabs = computed<Array<{ key: 'contract' | 'video'; label: string; count: n
 
 async function loadRemoteResources() {
   try {
-    const res = await fetch('http://localhost:3000/api/uploads/list', {
+    const res = await fetch('/api/uploads/list', {
       credentials: 'include',
     })
     const data = await res.json()
@@ -508,7 +508,7 @@ function triggerFileInput() {
 async function deleteUploadedFile(item: any) {
   if (!isAdmin.value) return
   try {
-    const res = await fetch(`http://localhost:3000/api/uploads/${item.id}`, {
+    const res = await fetch(`/api/uploads/${item.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${localStorage.getItem('ytx_token')}` },
       credentials: 'include',
@@ -537,7 +537,7 @@ async function handleUpload() {
   formData.append('description', uploadDesc.value || '')
 
   try {
-      const response = await fetch('http://localhost:3000/api/upload', {
+      const response = await fetch('/api/upload', {
       method: 'POST',
       headers: { Authorization: `Bearer ${localStorage.getItem('ytx_token')}` },
       body: formData,

@@ -216,7 +216,7 @@ async function deleteFileFromGroup(groupTitle: string, file: any) {
   if (!isAdmin.value) return
   if (file.id) {
     try {
-      const res = await fetch(`http://localhost:3000/api/uploads/${file.id}`, {
+      const res = await fetch(`/api/uploads/${file.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${localStorage.getItem('ytx_token')}` },
         credentials: 'include',
@@ -382,7 +382,7 @@ function saveDownloadGroups() {
 
 async function loadDownloadGroups() {
   try {
-    const res = await fetch('http://localhost:3000/api/uploads/list', { credentials: 'include' })
+    const res = await fetch('/api/uploads/list', { credentials: 'include' })
     const data = await res.json()
     if (data.success) {
       const resources = data.data
@@ -455,7 +455,7 @@ async function handleUpload() {
   formData.append('description', '管理员上传试用资源')
 
   try {
-    const response = await fetch('http://localhost:3000/api/upload', {
+    const response = await fetch('/api/upload', {
       method: 'POST',
       body: formData,
       headers: { Authorization: `Bearer ${localStorage.getItem('ytx_token')}` },

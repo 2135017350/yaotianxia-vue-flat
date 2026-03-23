@@ -233,7 +233,7 @@ const inputClass = computed(() => [
     : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white'
 ])
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000/api'
+const API_BASE = (import.meta.env.VITE_API_URL as string) || '/api'
 
 async function handleLogin() {
   loginError.value = ''

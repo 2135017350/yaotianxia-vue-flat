@@ -5,7 +5,7 @@ let users = [
     username: 'admin',
     email: 'admin@yaotianxia.com',
     phone: null,
-    password_hash: '$2b$10$gq6k7ExL/0xT6d4StJrWaOsLjgiDhwCSKUGt39vbkBqsdYlebs2Dm',
+    password_hash: '$2b$10$hF9qAqIHhidmLn9/cs1A.uoahiNrkK0cgut4U6kTTfSh0/mVNekPG', // admin123
     register_type: 'email',
     wechat_openid: null,
     is_verified: 1,
