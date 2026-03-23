@@ -23,7 +23,7 @@ export class LocalStorageService extends StorageService {
   }
 
   /**
-   * 保存文件到本地磁盘
+   * 保存文件到本地窗盘
    * @param {string} fileName - 原始文件名（包含中文）
    * @param {Buffer} fileBuffer - 文件内容缓冲区
    * @param {string} mimeType - 文件 MIME 类型
@@ -35,11 +35,18 @@ export class LocalStorageService extends StorageService {
       let correctedFileName = fileName
       try {
         // 尝试从 latin1 转换为 UTF-8
-        correctedFileName = Buffer.from(fileName, 'latin1').toString('utf8')
-        console.log(`[LocalStorage] 文件名编码修正: ${fileName} -> ${correctedFileName}`)
+        const decoded = Buffer.from(fileName, 'latin1').toString('utf8')
+        // 检查转换后的字符串是否有效（消除控制字符和非法字符）
+        if (this.isValidFileName(decoded)) {
+          correctedFileName = decoded
+          console.log(`[LocalStorage] 文件名编码修正: ${fileName} -> ${correctedFileName}`)
+        } else {
+          console.warn(`[LocalStorage] 转换后的文件名包含非法字符，使用清理后的名称`)
+          correctedFileName = this.sanitizeFileName(fileName)
+        }
       } catch (err) {
-        console.warn(`[LocalStorage] 文件名编码修正失败，使用原始名称: ${err.message}`)
-        correctedFileName = fileName
+        console.warn(`[LocalStorage] 文件名编码修正失败: ${err.message}，使用清理后的名称`)
+        correctedFileName = this.sanitizeFileName(fileName)
       }
 
       // 生成唯一的文件名（避免重名覆盖）
@@ -144,6 +151,44 @@ export class LocalStorageService extends StorageService {
       console.error('[LocalStorage] 检查文件失败:', error)
       return false
     }
+  }
+
+  /**
+   * 检查文件名是否有效（不含非法字符）
+   * @param {string} fileName - 文件名
+   * @returns {boolean}
+   */
+  isValidFileName(fileName) {
+    if (!fileName || typeof fileName !== 'string') return false
+    // Windows 不允许的字符: < > : " / \ | ? *
+    // 也不允许控制字符 (ASCII 0-31)
+    const invalidChars = /[<>:"|/?*\x00-\x1f]/g
+    return !invalidChars.test(fileName)
+  }
+
+  /**
+   * 清理文件名中的非法字符
+   * @param {string} fileName - 原始文件名
+   * @returns {string} 清理后的文件名
+   */
+  sanitizeFileName(fileName) {
+    if (!fileName || typeof fileName !== 'string') {
+      return `file_${Date.now()}`
+    }
+
+    // 离沐非法字符（不删除，改为下划线）
+    let sanitized = fileName
+      .replace(/[<>:"|/?*\x00-\x1f]/g, '_')  // Windows 非法字符
+      .replace(/\.{2,}/g, '.')                // 不允许连续的点
+      .trim()
+
+    // 如果清理后为空，使用时间戳作为文件名
+    if (!sanitized || sanitized === '') {
+      sanitized = `file_${Date.now()}`
+    }
+
+    console.log(`[LocalStorage] 文件名已清理: ${fileName} -> ${sanitized}`)
+    return sanitized
   }
 }
 
