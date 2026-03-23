@@ -84,7 +84,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     
     const fileSize = `${Math.round(req.file.size / 1024)}KB`
 
-    console.log(`[UPLOAD] 准备保存文件：文件名=${fileName}，大小=${fileSize}`)
+    // 检查 Buffer 是否有效
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      console.error(`[UPLOAD] 错误: 文件 Buffer 为空, size=${req.file.size}`)
+      return res.status(400).json({ success: false, message: '文件内容为空' })
+    }
+
+    console.log(`[UPLOAD] 准备保存文件：文件名=${fileName}，大小=${fileSize}，Buffer大小=${req.file.buffer.length} bytes`)
 
     // 调用存储服务保存文件
     const storageResult = await storageService.saveFile(

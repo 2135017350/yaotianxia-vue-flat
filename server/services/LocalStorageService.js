@@ -54,12 +54,28 @@ export class LocalStorageService extends StorageService {
       const uniqueFileName = `${timestamp}_${correctedFileName}`
       const filePath = path.join(this.uploadDir, uniqueFileName)
 
-      // 写入文件到磁盘
+      // 检查 fileBuffer 是否有效
+      if (!fileBuffer || fileBuffer.length === 0) {
+        throw new Error(`文件内容为空: Buffer 大小 = ${fileBuffer ? fileBuffer.length : 0} bytes`)
+      }
+
+      console.log(`[LocalStorage] 准备写入文件: ${filePath}, 大小 = ${fileBuffer.length} bytes`)
+
+      // 写入文件到窗盘
       await fs.promises.writeFile(filePath, fileBuffer)
+
+      // 验证文件是否成功写入
+      const stats = await fs.promises.stat(filePath)
+      if (stats.size === 0) {
+        throw new Error(`文件写入失败: 实际文件大小为 0 bytes`)
+      }
+      if (stats.size !== fileBuffer.length) {
+        console.warn(`[LocalStorage] 警告: 文件大小不匹配，预期 = ${fileBuffer.length} bytes, 实际 = ${stats.size} bytes`)
+      }
 
       // 返回相对路径（用于数据库存储）和访问 URL
       const relativePath = `/downloads/${uniqueFileName}`
-      console.log(`[LocalStorage] 文件已保存: ${filePath}`)
+      console.log(`[LocalStorage] 文件已保存: ${filePath}, 大小 = ${stats.size} bytes`)
 
       return {
         path: relativePath,
