@@ -72,6 +72,11 @@ export class LocalStorageService extends StorageService {
    */
   async getFileStream(filePath) {
     try {
+      // 检查路径是否有效
+      if (!filePath || typeof filePath !== 'string') {
+        throw new Error(`无效的文件路径: ${filePath}`)
+      }
+
       // 构建完整路径
       const fullPath = path.join(__dirname, '../public', filePath)
 
@@ -98,6 +103,12 @@ export class LocalStorageService extends StorageService {
    */
   async deleteFile(filePath) {
     try {
+      // 检查路径是否有效
+      if (!filePath || typeof filePath !== 'string') {
+        console.warn(`[LocalStorage] 跳过删除：无效的文件路径: ${filePath}`)
+        return false
+      }
+
       const fullPath = path.join(__dirname, '../public', filePath)
 
       if (fs.existsSync(fullPath)) {
@@ -121,6 +132,12 @@ export class LocalStorageService extends StorageService {
    */
   async fileExists(filePath) {
     try {
+      // 检查路径是否有效
+      if (!filePath || typeof filePath !== 'string') {
+        console.warn(`[LocalStorage] 跳过检查：无效的文件路径: ${filePath}`)
+        return false
+      }
+
       const fullPath = path.join(__dirname, '../public', filePath)
       return fs.existsSync(fullPath)
     } catch (error) {
