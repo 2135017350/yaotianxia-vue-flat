@@ -547,12 +547,14 @@ async function handleUpload() {
       credentials: 'include',
     })
     const result = await response.json()
+    console.log('[UPLOAD] 后端响应:', result)
     if (!result.success) {
       alert(`上传失败：${result.message || '未知错误'}`)
       return
     }
     await loadRemoteResources()
-    alert(`上传成功：${result.data.originalname}`)
+    const displayName = result.data?.originalname || result.data?.filename || '文件'
+    alert(`上传成功：${displayName}`)
 
     showUploadModal.value = false
     selectedFile.value = null

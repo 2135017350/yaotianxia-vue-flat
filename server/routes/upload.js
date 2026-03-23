@@ -52,6 +52,17 @@ function getUserFromToken(req) {
 
 // 上传文件
 router.post('/upload', upload.single('file'), async (req, res) => {
+  // 调试：打印 req.file 的完整结构
+  console.log('[UPLOAD] req.file 的完整结构:', {
+    fieldname: req.file?.fieldname,
+    originalname: req.file?.originalname,
+    encoding: req.file?.encoding,
+    mimetype: req.file?.mimetype,
+    size: req.file?.size,
+    bufferLength: req.file?.buffer?.length,
+  })
+  console.log('[UPLOAD] req.headers:', req.headers)
+  console.log('[UPLOAD] req.body:', req.body)
   try {
     const user = getUserFromToken(req)
     if (!user) {
@@ -138,7 +149,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       message: '上传成功',
       data: {
         id: result.insertId,
-        filename: fileName,
+        originalname: fileName,  // 前端需要的字段
+        filename: fileName,       // 向后兼容
         size: req.file.size,
       }
     })
