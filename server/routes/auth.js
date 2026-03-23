@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'yaotianxia_secret'
 // 生成 JWT Token
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email || null, phone: user.phone || null },
+    { id: user.id, email: user.email || null, phone: user.phone || null, role: user.role || 'user' },
     JWT_SECRET,
     { expiresIn: '7d' }
   )

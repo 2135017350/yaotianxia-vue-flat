@@ -40,13 +40,14 @@ VALUES (
 DROP TABLE IF EXISTS download_resources;
 CREATE TABLE download_resources (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(200) NOT NULL,
+  name VARCHAR(500) NOT NULL,
   description TEXT,
   size VARCHAR(50),
-  file_name VARCHAR(255) NOT NULL,
-  file_path VARCHAR(500) NOT NULL,
+  file_name VARCHAR(500) NOT NULL,
+  file_path VARCHAR(500),
+  file_data LONGBLOB,
   type ENUM('contract', 'video', 'other') DEFAULT 'other',
-  media_type VARCHAR(50) DEFAULT 'file',
+  media_type VARCHAR(100) DEFAULT 'file',
   created_by INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id)
