@@ -1,11 +1,14 @@
 import express from 'express'
 import multer from 'multer'
 import jwt from 'jsonwebtoken'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import LocalStorageService from '../services/LocalStorageService.js'
 // import S3StorageService from '../services/S3StorageService.js' // 未来可切换到云存储
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yaotianxia_secret'
 const router = express.Router()
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // 初始化存储服务（默认使用本地存储）
 // 如需切换到 S3 兼容存储（阿里云 OSS、腾讯云 COS 等），修改下面一行即可：
@@ -185,6 +188,7 @@ router.get('/uploads/:id/download', async (req, res) => {
     )
 
     if (!rows || rows.length === 0) {
+      console.warn(`[DOWNLOAD] 记录不存在，ID=${id}`)
       return res.status(404).json({ success: false, message: '文件不存在' })
     }
 
@@ -197,19 +201,28 @@ router.get('/uploads/:id/download', async (req, res) => {
       return res.status(404).json({ success: false, message: '文件已删除或不存在' })
     }
 
-    // 获取文件内容
-    const fileBuffer = await storageService.getFileStream(file_path)
+    // 构建完整的物理路径
+    const fullPath = path.join(__dirname, '../public', file_path)
 
     // 设置正确的响应头，确保中文文件名正确显示
-    res.setHeader('Content-Type', 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file_name)}`)
-    res.setHeader('Content-Length', fileBuffer.length)
 
-    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}`)
-    res.send(fileBuffer)
+    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}，路径=${fullPath}`)
+
+    // 使用 res.sendFile 下载文件（最稳定的方案）
+    res.sendFile(fullPath, (err) => {
+      if (err) {
+        console.error(`[DOWNLOAD] 下载失败，ID=${id}，错误=${err.message}`)
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, message: '下载失败' })
+        }
+      }
+    })
   } catch (error) {
     console.error('[DOWNLOAD] 下载错误:', error)
-    res.status(500).json({ success: false, message: error.message })
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: error.message })
+    }
   }
 })
 
