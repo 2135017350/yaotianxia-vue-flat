@@ -511,7 +511,7 @@ async function deleteUploadedFile(item: any) {
     const headers = getAuthHeaders()
     const res = await fetch(`/api/uploads/${item.id}`, {
       method: 'DELETE',
-      headers: { ...headers },
+      headers: headers as HeadersInit,
       credentials: 'include',
     })
     const data = await res.json()
@@ -542,7 +542,7 @@ async function handleUpload() {
       console.log('[UPLOAD] 发送请求，Token:', token.value ? '存在' : '不存在', 'Headers:', headers)
       const response = await fetch('/api/upload', {
       method: 'POST',
-      headers: { ...headers },
+      headers: headers as HeadersInit,
       body: formData,
       credentials: 'include',
     })
