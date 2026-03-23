@@ -29,11 +29,17 @@ const upload = multer({
 
 function getUserFromToken(req) {
   const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.warn('[AUTH] 缺少 Authorization 头')
+    return null
+  }
   try {
     const token = authHeader.slice(7)
-    return jwt.verify(token, JWT_SECRET)
-  } catch {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    console.log('[AUTH] Token 解析成功:', { id: decoded.id, role: decoded.role })
+    return decoded
+  } catch (err) {
+    console.error('[AUTH] Token 验证失败:', err.message)
     return null
   }
 }
@@ -43,13 +49,16 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const user = getUserFromToken(req)
     if (!user) {
+      console.warn('[UPLOAD] 用户未授权')
       return res.status(401).json({ success: false, message: '未授权，请先登录' })
     }
 
     // 检查用户是否为管理员（从 token 中读取 role，避免异步查询导致的时序问题）
-    if (user.role !== 'admin') {
+    if (!user.role || user.role !== 'admin') {
+      console.warn(`[UPLOAD] 用户 ${user.id} 权限不足，role=${user.role}`)
       return res.status(403).json({ success: false, message: '仅管理员可上传文件' })
     }
+    console.log(`[UPLOAD] 管理员 ${user.id} 开始上传文件`)
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: '未选择文件' })
@@ -66,6 +75,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       [fileName, description || '', fileSize, fileName, req.file.buffer, type, req.file.mimetype, user.id]
     )
 
+    console.log(`[UPLOAD] 文件上传成功，ID=${result.insertId}，文件名=${fileName}`)
     res.json({
       success: true,
       message: '上传成功',
@@ -126,11 +136,13 @@ router.delete('/uploads/:id', async (req, res) => {
   try {
     const tokenUser = getUserFromToken(req)
     if (!tokenUser) {
+      console.warn('[DELETE] 用户未授权')
       return res.status(401).json({ success: false, message: '未授权' })
     }
 
     // 从 token 中检查 role，而不是查询数据库
-    if (tokenUser.role !== 'admin') {
+    if (!tokenUser.role || tokenUser.role !== 'admin') {
+      console.warn(`[DELETE] 用户 ${tokenUser.id} 权限不足，role=${tokenUser.role}`)
       return res.status(403).json({ success: false, message: '仅管理员可删除' })
     }
 
@@ -141,6 +153,7 @@ router.delete('/uploads/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: '文件不存在' })
     }
 
+    console.log(`[DELETE] 文件删除成功，ID=${id}`)
     res.json({ success: true, message: '删除成功' })
   } catch (error) {
     console.error('删除错误:', error)

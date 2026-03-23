@@ -288,8 +288,8 @@ import { useAuth } from '../composables/useAuth'
 
 const { theme } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
-const { isLoggedIn, user: currentUser, logout } = useAuth()
-const isAdmin = computed(() => currentUser?.value?.role === 'admin' || currentUser?.value?.username?.toLowerCase?.() === 'admin')
+const { isLoggedIn, user: currentUser, logout, token } = useAuth()
+const isAdmin = computed(() => currentUser?.value?.role === 'admin')
 
 const activeTab = ref<'contract' | 'video'>('contract')
 const uploadType = ref<'contract' | 'video'>('contract')
@@ -510,7 +510,7 @@ async function deleteUploadedFile(item: any) {
   try {
     const res = await fetch(`/api/uploads/${item.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${localStorage.getItem('ytx_token')}` },
+      headers: { Authorization: `Bearer ${token.value}` },
       credentials: 'include',
     })
     const data = await res.json()
@@ -539,7 +539,7 @@ async function handleUpload() {
   try {
       const response = await fetch('/api/upload', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('ytx_token')}` },
+      headers: { Authorization: `Bearer ${token.value}` },
       body: formData,
       credentials: 'include',
     })
