@@ -72,7 +72,16 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     const { uploadType, description } = req.body
     const type = uploadType === 'video' ? 'video' : 'contract'
-    const fileName = req.file.originalname // 原始文件名（包含中文）
+    
+    // 修复 multer 中文乱码问题：将 latin1 编码的文件名转换为 UTF-8
+    let fileName = req.file.originalname
+    try {
+      fileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
+      console.log(`[UPLOAD] 文件名编码修正: ${req.file.originalname} -> ${fileName}`)
+    } catch (err) {
+      console.warn(`[UPLOAD] 文件名编码修正失败: ${err.message}`)
+    }
+    
     const fileSize = `${Math.round(req.file.size / 1024)}KB`
 
     console.log(`[UPLOAD] 准备保存文件：文件名=${fileName}，大小=${fileSize}`)

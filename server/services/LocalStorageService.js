@@ -31,9 +31,20 @@ export class LocalStorageService extends StorageService {
    */
   async saveFile(fileName, fileBuffer, mimeType) {
     try {
+      // 修复 multer 中文乱码问题：将 latin1 编码的文件名转换为 UTF-8
+      let correctedFileName = fileName
+      try {
+        // 尝试从 latin1 转换为 UTF-8
+        correctedFileName = Buffer.from(fileName, 'latin1').toString('utf8')
+        console.log(`[LocalStorage] 文件名编码修正: ${fileName} -> ${correctedFileName}`)
+      } catch (err) {
+        console.warn(`[LocalStorage] 文件名编码修正失败，使用原始名称: ${err.message}`)
+        correctedFileName = fileName
+      }
+
       // 生成唯一的文件名（避免重名覆盖）
       const timestamp = Date.now()
-      const uniqueFileName = `${timestamp}_${fileName}`
+      const uniqueFileName = `${timestamp}_${correctedFileName}`
       const filePath = path.join(this.uploadDir, uniqueFileName)
 
       // 写入文件到磁盘
