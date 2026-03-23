@@ -26,7 +26,7 @@ router.post('/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
-    let sql, params
+    let sql, params, finalUsername
 
     if (type === 'email') {
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -37,8 +37,14 @@ router.post('/register', async (req, res) => {
       if (existing.length > 0) {
         return res.status(400).json({ success: false, message: '该邮箱已注册，请直接登录' })
       }
+      finalUsername = username || email.split('@')[0]
+      // 确保用户名唯一（若重复则追加随机后缀）
+      const [unameCheck] = await db.query('SELECT id FROM users WHERE username = ?', [finalUsername])
+      if (unameCheck.length > 0) {
+        finalUsername = finalUsername + '_' + Date.now().toString().slice(-4)
+      }
       sql = 'INSERT INTO users (email, username, password_hash, register_type, role) VALUES (?, ?, ?, ?, ?)'
-      params = [email, username || email.split('@')[0], passwordHash, 'email', 'user']
+      params = [email, finalUsername, passwordHash, 'email', 'user']
     } else if (type === 'phone') {
       if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
         return res.status(400).json({ success: false, message: '手机号格式不正确' })
@@ -48,8 +54,14 @@ router.post('/register', async (req, res) => {
       if (existing.length > 0) {
         return res.status(400).json({ success: false, message: '该手机号已注册，请直接登录' })
       }
+      finalUsername = username || phone
+      // 确保用户名唯一（若重复则追加随机后缀）
+      const [unameCheck] = await db.query('SELECT id FROM users WHERE username = ?', [finalUsername])
+      if (unameCheck.length > 0) {
+        finalUsername = finalUsername + '_' + Date.now().toString().slice(-4)
+      }
       sql = 'INSERT INTO users (phone, username, password_hash, register_type, role) VALUES (?, ?, ?, ?, ?)'
-      params = [phone, username || phone, passwordHash, 'phone', 'user']
+      params = [phone, finalUsername, passwordHash, 'phone', 'user']
     } else {
       return res.status(400).json({ success: false, message: '注册类型不正确' })
     }
@@ -57,7 +69,7 @@ router.post('/register', async (req, res) => {
     const [result] = await db.query(sql, params)
     const userId = result.insertId
 
-    const token = generateToken({ id: userId, email, phone })
+    const token = generateToken({ id: userId, email: email || null, phone: phone || null })
     res.json({
       success: true,
       message: '注册成功',
@@ -65,7 +77,7 @@ router.post('/register', async (req, res) => {
       userId,
       user: {
         id: userId,
-        username: username || (type === 'email' ? email.split('@')[0] : phone),
+        username: finalUsername,
         email: type === 'email' ? email : null,
         phone: type === 'phone' ? phone : null,
         role: 'user',
@@ -77,7 +89,7 @@ router.post('/register', async (req, res) => {
   }
 })
 
-// 登录（邮箱或手机号）
+// 登录（支持邮箱、手机号、用户名三种方式）
 // 注意：验证码由前端 Canvas 验证，后端不再校验验证码
 router.post('/login', async (req, res) => {
   try {
@@ -87,19 +99,20 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ success: false, message: '请填写账号和密码' })
     }
 
-    // 判断是邮箱、手机号或用户名
-    let sql
-    let queryValue = account
+    // 判断是邮箱、手机号还是用户名，分别查询
+    let rows
     if (account.includes('@')) {
-      sql = 'SELECT * FROM users WHERE email = ?'
+      // 邮箱登录
+      ;[rows] = await db.query('SELECT * FROM users WHERE email = ?', [account])
     } else if (/^1[3-9]\d{9}$/.test(account)) {
-      sql = 'SELECT * FROM users WHERE phone = ?'
+      // 手机号登录
+      ;[rows] = await db.query('SELECT * FROM users WHERE phone = ?', [account])
     } else {
-      sql = 'SELECT * FROM users WHERE username = ?'
+      // 用户名登录
+      ;[rows] = await db.query('SELECT * FROM users WHERE username = ?', [account])
     }
 
-    const [rows] = await db.query(sql, [queryValue])
-    if (rows.length === 0) {
+    if (!rows || rows.length === 0) {
       return res.status(400).json({ success: false, message: '账号不存在，请先注册' })
     }
 
