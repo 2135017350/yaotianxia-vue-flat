@@ -66,16 +66,45 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     const { uploadType, description } = req.body
     const type = uploadType === 'video' ? 'video' : 'contract'
-    const fileName = req.file.originalname // 保留原始文件名（包含中文）
+    
+    // 确保文件名使用 UTF-8 编码
+    let fileName = req.file.originalname
+    if (Buffer.isBuffer(fileName)) {
+      fileName = fileName.toString('utf8')
+    }
+    
     const fileSize = `${Math.round(req.file.size / 1024)}KB`
+    const fileBuffer = req.file.buffer
+
+    console.log(`[UPLOAD] 准备写入数据库：文件名=${fileName}，大小=${fileSize}，缓冲区=${fileBuffer.length} bytes`)
 
     // 将文件内容存入数据库的 file_data 字段
     const [result] = await db.query(
       'INSERT INTO download_resources (name, description, size, file_name, file_path, file_data, type, media_type, created_by) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)',
-      [fileName, description || '', fileSize, fileName, req.file.buffer, type, req.file.mimetype, user.id]
+      [fileName, description || '', fileSize, fileName, fileBuffer, type, req.file.mimetype, user.id]
     )
 
-    console.log(`[UPLOAD] 文件上传成功，ID=${result.insertId}，文件名=${fileName}`)
+    // 校验插入结果
+    if (!result || !result.insertId) {
+      console.error('[UPLOAD] 数据库插入失败：insertId 为空')
+      return res.status(500).json({ success: false, message: '文件保存失败，请检查数据库配置' })
+    }
+
+    // 验证文件是否真的写入了数据库
+    const [verify] = await db.query(
+      'SELECT id, file_name, OCTET_LENGTH(file_data) as data_size FROM download_resources WHERE id = ?',
+      [result.insertId]
+    )
+    if (!verify || verify.length === 0) {
+      console.error(`[UPLOAD] 数据库验证失败：ID=${result.insertId} 的记录不存在`)
+      return res.status(500).json({ success: false, message: '文件保存失败，验证不通过' })
+    }
+    if (!verify[0].data_size || verify[0].data_size === 0) {
+      console.error(`[UPLOAD] 数据库验证失败：ID=${result.insertId} 的文件数据为空，大小=${verify[0].data_size}`)
+      return res.status(500).json({ success: false, message: '文件数据保存失败，请检查 max_allowed_packet 配置' })
+    }
+
+    console.log(`[UPLOAD] 文件上传成功，ID=${result.insertId}，文件名=${fileName}，数据库已验证，实际大小=${verify[0].data_size} bytes`)
     res.json({
       success: true,
       message: '上传成功',
@@ -119,11 +148,17 @@ router.get('/uploads/:id/download', async (req, res) => {
 
     const { file_name, file_data, media_type } = rows[0]
 
+    if (!file_data || file_data.length === 0) {
+      console.error(`[DOWNLOAD] 文件数据为空，ID=${id}`)
+      return res.status(404).json({ success: false, message: '文件数据为空' })
+    }
+
     // 设置正确的响应头，确保中文文件名正确显示
     res.setHeader('Content-Type', media_type || 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file_name)}`)
     res.setHeader('Content-Length', file_data.length)
 
+    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}，大小=${file_data.length} bytes`)
     res.send(file_data)
   } catch (error) {
     console.error('下载错误:', error)
