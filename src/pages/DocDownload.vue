@@ -537,20 +537,15 @@ async function handleUpload() {
   formData.append('description', uploadDesc.value || '')
 
   try {
-    const response = await fetch('http://localhost:3000/api/upload', {
+      const response = await fetch('http://localhost:3000/api/upload', {
       method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('ytx_token')}` },
       body: formData,
       credentials: 'include',
     })
     const result = await response.json()
-
     if (!result.success) {
       alert(`上传失败：${result.message || '未知错误'}`)
-      return
-    }
-
-    if (!isAdmin.value) {
-      alert('只有管理员可上传文档')
       return
     }
     await loadRemoteResources()

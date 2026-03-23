@@ -63,40 +63,48 @@ let nextId = {
 // 模拟数据库查询
 const pool = {
   query: async (sql, params = []) => {
-    sql = sql.trim().toUpperCase()
+    const sqlUpper = sql.trim().toUpperCase()
 
-    if (sql.startsWith('SELECT')) {
+    if (sqlUpper.startsWith('SELECT')) {
       // 简单的 SELECT 模拟
-      if (sql.includes('FROM USERS')) {
+      if (sqlUpper.includes('FROM USERS')) {
         let result = users
-        if (sql.includes('WHERE EMAIL = ?')) {
+        if (sqlUpper.includes('WHERE EMAIL = ?')) {
           result = users.filter(u => u.email === params[0])
-        } else if (sql.includes('WHERE PHONE = ?')) {
+        } else if (sqlUpper.includes('WHERE PHONE = ?')) {
           result = users.filter(u => u.phone === params[0])
-        } else if (sql.includes('WHERE USERNAME = ?')) {
+        } else if (sqlUpper.includes('WHERE USERNAME = ?')) {
           result = users.filter(u => u.username === params[0])
-        } else if (sql.includes('WHERE ID = ?')) {
+        } else if (sqlUpper.includes('WHERE ID = ?')) {
           result = users.filter(u => u.id === params[0])
         }
         return [result]
-      } else if (sql.includes('FROM NEWS')) {
+      } else if (sqlUpper.includes('FROM NEWS')) {
         return [news]
-      } else if (sql.includes('FROM DOWNLOAD_RESOURCES')) {
-        return [download_resources]
-      } else if (sql.includes('FROM TRIAL_APPLICATIONS')) {
+      } else if (sqlUpper.includes('FROM DOWNLOAD_RESOURCES')) {
+        // 支持 LEFT JOIN users 查询
+        const enriched = download_resources.map(dr => ({
+          ...dr,
+          uploaded_by: users.find(u => u.id === dr.created_by)?.username || null
+        }))
+        return [enriched]
+      } else if (sqlUpper.includes('FROM TRIAL_APPLICATIONS')) {
         return [trial_applications]
-      } else if (sql.includes('FROM PROJECT_REPORTS')) {
+      } else if (sqlUpper.includes('FROM PROJECT_REPORTS')) {
         return [project_reports]
       }
       return [[]]
-    } else if (sql.startsWith('INSERT')) {
+    } else if (sqlUpper.startsWith('INSERT')) {
       // 简单的 INSERT 模拟
-      if (sql.includes('INTO USERS')) {
+      if (sqlUpper.includes('INTO USERS')) {
+        // auth.js 邮箱注册传参顺序: [email, username, passwordHash, 'email', 'user']
+        // auth.js 手机号注册传参顺序: [phone, username, passwordHash, 'phone', 'user']
+        const register_type = params[3]
         const newUser = {
           id: nextId.users++,
-          username: params[0] || params[1]?.split('@')[0] || params[1],
-          email: params[1] || null,
-          phone: params[0] || null,
+          email: register_type === 'email' ? params[0] : null,
+          phone: register_type === 'phone' ? params[0] : null,
+          username: params[1],
           password_hash: params[2],
           register_type: params[3],
           role: params[4] || 'user',
@@ -108,7 +116,22 @@ const pool = {
         }
         users.push(newUser)
         return [{ insertId: newUser.id }]
-      } else if (sql.includes('INTO TRIAL_APPLICATIONS')) {
+      } else if (sqlUpper.includes('INTO DOWNLOAD_RESOURCES')) {
+        const newResource = {
+          id: nextId.download_resources++,
+          name: params[0],
+          description: params[1],
+          size: params[2],
+          file_name: params[3],
+          file_path: params[4],
+          type: params[5],
+          media_type: params[6],
+          created_by: params[7],
+          created_at: new Date().toISOString()
+        }
+        download_resources.push(newResource)
+        return [{ insertId: newResource.id }]
+      } else if (sqlUpper.includes('INTO TRIAL_APPLICATIONS')) {
         const newApp = {
           id: nextId.trial_applications++,
           company_name: params[0],
@@ -123,7 +146,7 @@ const pool = {
         }
         trial_applications.push(newApp)
         return [{ insertId: newApp.id }]
-      } else if (sql.includes('INTO PROJECT_REPORTS')) {
+      } else if (sqlUpper.includes('INTO PROJECT_REPORTS')) {
         const newReport = {
           id: nextId.project_reports++,
           customer_name: params[0],
@@ -138,13 +161,21 @@ const pool = {
         return [{ insertId: newReport.id }]
       }
       return [{ insertId: 1 }]
-    } else if (sql.startsWith('UPDATE')) {
+    } else if (sqlUpper.startsWith('UPDATE')) {
       // 简单的 UPDATE 模拟
-      if (sql.includes('USERS')) {
-        const user = users.find(u => u.id === params[1])
+      if (sqlUpper.includes('USERS')) {
+        const user = users.find(u => u.id === params[params.length - 1])
         if (user) {
           user.last_login = params[0]
+          user.updated_at = new Date().toISOString()
         }
+      }
+      return [{ affectedRows: 1 }]
+    } else if (sqlUpper.startsWith('DELETE')) {
+      if (sqlUpper.includes('FROM DOWNLOAD_RESOURCES')) {
+        const id = params[0]
+        const idx = download_resources.findIndex(r => r.id === id)
+        if (idx !== -1) download_resources.splice(idx, 1)
       }
       return [{ affectedRows: 1 }]
     }
