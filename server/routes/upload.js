@@ -1,32 +1,19 @@
 import express from 'express'
 import multer from 'multer'
 import jwt from 'jsonwebtoken'
-import path from 'path'
-import fs from 'fs'
-import { fileURLToPath } from 'url'
-import db from '../db.js'
+import LocalStorageService from '../services/LocalStorageService.js'
+// import S3StorageService from '../services/S3StorageService.js' // 未来可切换到云存储
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yaotianxia_secret'
 const router = express.Router()
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// 确保上传目录存在
-const uploadDir = path.join(__dirname, '../public/downloads')
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true })
-  console.log(`[INIT] 创建上传目录: ${uploadDir}`)
-}
+// 初始化存储服务（默认使用本地存储）
+// 如需切换到 S3 兼容存储（阿里云 OSS、腾讯云 COS 等），修改下面一行即可：
+// const storageService = new S3StorageService()
+const storageService = new LocalStorageService()
 
-// 自定义存储配置（保留原始文件名，避免乱码）
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir)
-  },
-  filename: (req, file, cb) => {
-    // 保留原始文件名（包含中文），multer 会自动处理编码
-    cb(null, file.originalname)
-  }
-})
+// 内存存储（multer 不写入磁盘，由 storageService 处理）
+const storage = multer.memoryStorage()
 
 // 文件过滤（只允许特定类型）
 const fileFilter = (req, file, cb) => {
@@ -63,7 +50,7 @@ function getUserFromToken(req) {
   }
 }
 
-// 上传文件到本地文件系统
+// 上传文件
 router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const user = getUserFromToken(req)
@@ -86,23 +73,33 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const { uploadType, description } = req.body
     const type = uploadType === 'video' ? 'video' : 'contract'
     const fileName = req.file.originalname // 原始文件名（包含中文）
-    const filePath = `/downloads/${fileName}` // 相对路径，用于下载
     const fileSize = `${Math.round(req.file.size / 1024)}KB`
 
-    console.log(`[UPLOAD] 文件已保存到磁盘: ${req.file.path}`)
-    console.log(`[UPLOAD] 准备写入数据库：文件名=${fileName}，路径=${filePath}，大小=${fileSize}`)
+    console.log(`[UPLOAD] 准备保存文件：文件名=${fileName}，大小=${fileSize}`)
+
+    // 调用存储服务保存文件
+    const storageResult = await storageService.saveFile(
+      fileName,
+      req.file.buffer,
+      req.file.mimetype
+    )
+
+    console.log(`[UPLOAD] 文件已保存，路径=${storageResult.path}`)
+
+    // 导入 db 模块（需要在使用时导入，避免循环依赖）
+    const { default: db } = await import('../db.js')
 
     // 将文件信息存入数据库
     const [result] = await db.query(
       'INSERT INTO download_resources (name, description, size, file_name, file_path, type, media_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [fileName, description || '', fileSize, fileName, filePath, type, req.file.mimetype, user.id]
+      [fileName, description || '', fileSize, fileName, storageResult.path, type, req.file.mimetype, user.id]
     )
 
     if (!result || !result.insertId) {
       console.error('[UPLOAD] 数据库插入失败：insertId 为空')
-      // 删除已上传的文件
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error('[UPLOAD] 删除文件失败:', err)
+      // 删除已保存的文件
+      await storageService.deleteFile(storageResult.path).catch(err => {
+        console.error('[UPLOAD] 删除文件失败:', err)
       })
       return res.status(500).json({ success: false, message: '文件保存失败，请检查数据库配置' })
     }
@@ -114,8 +111,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     )
     if (!verify || verify.length === 0) {
       console.error(`[UPLOAD] 数据库验证失败：ID=${result.insertId} 的记录不存在`)
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error('[UPLOAD] 删除文件失败:', err)
+      await storageService.deleteFile(storageResult.path).catch(err => {
+        console.error('[UPLOAD] 删除文件失败:', err)
       })
       return res.status(500).json({ success: false, message: '文件保存失败，验证不通过' })
     }
@@ -132,12 +129,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     })
   } catch (error) {
     console.error('[UPLOAD] 上传错误:', error)
-    // 如果上传过程中出错，删除已保存的文件
-    if (req.file && req.file.path) {
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error('[UPLOAD] 删除文件失败:', err)
-      })
-    }
     res.status(500).json({ success: false, message: error.message || '上传失败' })
   }
 })
@@ -145,6 +136,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 // 获取文件列表
 router.get('/uploads/list', async (req, res) => {
   try {
+    const { default: db } = await import('../db.js')
     const [rows] = await db.query(
       'SELECT id, name, file_name, description, size, type, created_by, created_at, (SELECT username FROM users WHERE id = created_by) AS uploaded_by FROM download_resources ORDER BY created_at DESC'
     )
@@ -155,9 +147,10 @@ router.get('/uploads/list', async (req, res) => {
   }
 })
 
-// 下载文件（从本地文件系统读取）
+// 下载文件
 router.get('/uploads/:id/download', async (req, res) => {
   try {
+    const { default: db } = await import('../db.js')
     const id = parseInt(req.params.id, 10)
     const [rows] = await db.query(
       'SELECT file_name, file_path FROM download_resources WHERE id = ?',
@@ -169,20 +162,24 @@ router.get('/uploads/:id/download', async (req, res) => {
     }
 
     const { file_name, file_path } = rows[0]
-    const fullPath = path.join(__dirname, '../public', file_path)
 
     // 检查文件是否存在
-    if (!fs.existsSync(fullPath)) {
-      console.error(`[DOWNLOAD] 文件不存在，ID=${id}，路径=${fullPath}`)
+    const exists = await storageService.fileExists(file_path)
+    if (!exists) {
+      console.error(`[DOWNLOAD] 文件不存在，ID=${id}，路径=${file_path}`)
       return res.status(404).json({ success: false, message: '文件已删除或不存在' })
     }
+
+    // 获取文件内容
+    const fileBuffer = await storageService.getFileStream(file_path)
 
     // 设置正确的响应头，确保中文文件名正确显示
     res.setHeader('Content-Type', 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file_name)}`)
+    res.setHeader('Content-Length', fileBuffer.length)
 
-    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}，路径=${fullPath}`)
-    res.download(fullPath, file_name)
+    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}`)
+    res.send(fileBuffer)
   } catch (error) {
     console.error('[DOWNLOAD] 下载错误:', error)
     res.status(500).json({ success: false, message: error.message })
@@ -204,6 +201,7 @@ router.delete('/uploads/:id', async (req, res) => {
       return res.status(403).json({ success: false, message: '仅管理员可删除' })
     }
 
+    const { default: db } = await import('../db.js')
     const id = parseInt(req.params.id, 10)
     
     // 先查询文件路径
@@ -217,7 +215,6 @@ router.delete('/uploads/:id', async (req, res) => {
     }
 
     const { file_path } = rows[0]
-    const fullPath = path.join(__dirname, '../public', file_path)
 
     // 删除数据库记录
     const [result] = await db.query('DELETE FROM download_resources WHERE id = ?', [id])
@@ -226,18 +223,15 @@ router.delete('/uploads/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: '文件不存在' })
     }
 
-    // 删除本地文件
-    if (fs.existsSync(fullPath)) {
-      fs.unlink(fullPath, (err) => {
-        if (err) {
-          console.error(`[DELETE] 删除文件失败，ID=${id}，路径=${fullPath}:`, err)
-        } else {
-          console.log(`[DELETE] 文件已删除，ID=${id}，路径=${fullPath}`)
-        }
-      })
+    // 删除存储中的文件
+    try {
+      await storageService.deleteFile(file_path)
+    } catch (err) {
+      console.error(`[DELETE] 删除存储文件失败，ID=${id}:`, err)
+      // 即使删除文件失败，数据库记录已删除，不返回错误
     }
 
-    console.log(`[DELETE] 文件删除成功（数据库），ID=${id}`)
+    console.log(`[DELETE] 文件删除成功，ID=${id}`)
     res.json({ success: true, message: '删除成功' })
   } catch (error) {
     console.error('[DELETE] 删除错误:', error)
