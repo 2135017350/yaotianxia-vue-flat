@@ -288,7 +288,7 @@ import { useAuth } from '../composables/useAuth'
 
 const { theme } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
-const { isLoggedIn, user: currentUser, logout, token } = useAuth()
+const { isLoggedIn, user: currentUser, logout, token, getAuthHeaders } = useAuth()
 const isAdmin = computed(() => currentUser?.value?.role === 'admin')
 
 const activeTab = ref<'contract' | 'video'>('contract')
@@ -508,9 +508,10 @@ function triggerFileInput() {
 async function deleteUploadedFile(item: any) {
   if (!isAdmin.value) return
   try {
+    const headers = getAuthHeaders()
     const res = await fetch(`/api/uploads/${item.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token.value}` },
+      headers: { ...headers },
       credentials: 'include',
     })
     const data = await res.json()
@@ -537,9 +538,11 @@ async function handleUpload() {
   formData.append('description', uploadDesc.value || '')
 
   try {
+      const headers = getAuthHeaders()
+      console.log('[UPLOAD] 发送请求，Token:', token.value ? '存在' : '不存在', 'Headers:', headers)
       const response = await fetch('/api/upload', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token.value}` },
+      headers: { ...headers },
       body: formData,
       credentials: 'include',
     })
