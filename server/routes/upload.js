@@ -71,7 +71,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     // 将文件内容存入数据库的 file_data 字段
     const [result] = await db.query(
-      'INSERT INTO download_resources (name, description, size, file_name, file_data, type, media_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO download_resources (name, description, size, file_name, file_path, file_data, type, media_type, created_by) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)',
       [fileName, description || '', fileSize, fileName, req.file.buffer, type, req.file.mimetype, user.id]
     )
 

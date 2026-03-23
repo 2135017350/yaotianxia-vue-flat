@@ -44,7 +44,7 @@ CREATE TABLE download_resources (
   description TEXT,
   size VARCHAR(50),
   file_name VARCHAR(500) NOT NULL,
-  file_path VARCHAR(500),
+  file_path VARCHAR(500) DEFAULT NULL,
   file_data LONGBLOB,
   type ENUM('contract', 'video', 'other') DEFAULT 'other',
   media_type VARCHAR(100) DEFAULT 'file',
