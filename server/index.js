@@ -83,7 +83,9 @@ app.use('/downloads', express.static(downloadsPath))
 // Bug Fix #6: 修复 Express 5.x 中的路由通配符语法
 // Express 5.x 使用 path-to-regexp 8.x，不再支持 /* 写法
 // 必须使用 (.*) 或 :path(*) 来匹配所有路径
-app.get('/:path*', (req, res) => {
+// Bug Fix #7: 使用正则表达式匹配所有路由
+// 这是 Express 5.x 中最稳定的 SPA 通配符方案
+app.get(/^(?!\/api).*/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
 
