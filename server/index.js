@@ -13,15 +13,13 @@ dotenv.config()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
-const PORT = process.env.PORT || 3000
+// Bug Fix #1: 固定使用 3000 端口，不再依赖环境变量
+const PORT = 3000
 
-// 允许的前端来源（支持多个，兼容开发模式和生产模式）
+// Bug Fix #1: 优化 CORS 配置，主要支持 3000 端口的前端
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  `http://localhost:${PORT}`,
   'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:5173',
+  process.env.FRONTEND_URL,
 ].filter(Boolean)
 
 // 中间件
