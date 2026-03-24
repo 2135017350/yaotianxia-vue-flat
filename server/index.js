@@ -5,6 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
 import fs from 'fs'
+import history from 'connect-history-api-fallback'
 import captchaRouter from './routes/captcha.js'
 import authRouter from './routes/auth.js'
 import formsRouter from './routes/forms.js'
@@ -67,9 +68,17 @@ if (!fs.existsSync(downloadsPath)) {
   console.log(`[SERVER] 创建上传目录: ${downloadsPath}`)
 }
 
-// Bug Fix #4: 修复 SPA 路由顺序问题
-// 必须先托管所有静态文件和 API 路由，再处理 SPA 通配符路由
-// 否则文件下载请求会被 SPA 路由拦截并返回 HTML 内容
+// Bug Fix #9: 使用工业标准方案 connect-history-api-fallback
+// 这个中间件能智慧地处理 SPA 路由，自动排除静态文件和 API 路由
+const historyFallback = history({
+  disableDotRule: false,
+  rewrites: [
+    // 所有 /api 路由不重写
+    { from: /^\/api\/.*$/, to: (context) => context.parsedUrl.pathname },
+    // 所有 /downloads 路由不重写
+    { from: /^\/downloads\/.*$/, to: (context) => context.parsedUrl.pathname },
+  ]
+})
 
 // 托管前端静态文件
 app.use(express.static(distPath))
@@ -77,19 +86,12 @@ app.use(express.static(distPath))
 // Bug Fix #1: 添加上传目录的静态文件托管，便前端下载
 app.use('/downloads', express.static(downloadsPath))
 
-// Bug Fix #4: SPA 通配符路由必须放在最后
-// 这样所有真实的文件请求都会被静态文件中间件处理
-// 只有不存在的路由才会被重定向到 index.html
-// Bug Fix #6: 修复 Express 5.x 中的路由通配符语法
-// Express 5.x 使用 path-to-regexp 8.x，不再支持 /* 写法
-// 必须使用 (.*) 或 :path(*) 来匹配所有路径
-// Bug Fix #7: 使用正则表达式匹配所有路由
-// 这是 Express 5.x 中最稳定的 SPA 通配符方案
-// Bug Fix #8: 修复正则表达式，排除 /downloads 和 /api 路由
-// 只有不匹配这些前缀的请求才会被重定向到 index.html
-app.get(/^(?!\/api|\/downloads).*/, (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'))
-})
+// Bug Fix #9: 使用 connect-history-api-fallback 中间件处理 SPA 路由
+// 此中间件必须放在所有静态文件托管之后，以便不会拦截真实文件
+app.use(historyFallback)
+
+// 最后再托管一遍前端静态文件（为了处理 SPA 路由后的文件请求）
+app.use(express.static(distPath))
 
 app.listen(PORT, () => {
   console.log(`\n🚀 药天下后端服务已启动`)
