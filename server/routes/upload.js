@@ -18,14 +18,19 @@ const storageService = new LocalStorageService()
 // 内存存储（multer 不写入磁盘，由 storageService 处理）
 const storage = multer.memoryStorage()
 
+// Bug Fix #2: 修复文件类型过滤器，允许更多文件类型
 // 文件过滤（只允许特定类型）
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /pdf|doc|docx|xls|xlsx|mp4|avi|mov|rar|zip/
-  const extname = allowedTypes.test(file.originalname.split('.').pop().toLowerCase())
-  if (extname) {
+  // 支持的文件类型：pdf, doc, docx, xls, xlsx, mp4, avi, mov, rar, zip, exe, apk
+  const allowedTypes = /^(pdf|doc|docx|xls|xlsx|mp4|avi|mov|rar|zip|exe|apk)$/i
+  const ext = file.originalname.split('.').pop()?.toLowerCase() || ''
+  
+  if (allowedTypes.test(ext)) {
+    console.log(`[UPLOAD] 文件类型校验成功: ${ext}`)
     cb(null, true)
   } else {
-    cb(new Error('不支持的文件类型'))
+    console.warn(`[UPLOAD] 文件类型不支持: ${ext}`)
+    cb(new Error(`不支持的文件类型: .${ext}`))
   }
 }
 
@@ -53,9 +58,24 @@ function getUserFromToken(req) {
   }
 }
 
-// 上传文件
-router.post('/upload', upload.single('file'), async (req, res) => {
-  // 调试：打印 req.file 的完整结构
+// Bug Fix #2: 添加 multer 错误处理中間件
+router.post('/upload', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      console.error('[UPLOAD] Multer 错误:', err.code, err.message)
+      if (err.code === 'FILE_TOO_LARGE') {
+        return res.status(400).json({ success: false, message: '文件过大，最大 100MB' })
+      }
+      return res.status(400).json({ success: false, message: `文件上传错误: ${err.message}` })
+    } else if (err) {
+      console.error('[UPLOAD] 上传错误:', err.message)
+      return res.status(400).json({ success: false, message: err.message })
+    }
+    next()
+  })
+}, async (req, res) => {
+  // Bug Fix #2: 增强调试日志，帮助诊断上传失败问题
+  console.log('[UPLOAD] ===== 上传请求开始 =====')
   console.log('[UPLOAD] req.file 的完整结构:', {
     fieldname: req.file?.fieldname,
     originalname: req.file?.originalname,
@@ -64,7 +84,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     size: req.file?.size,
     bufferLength: req.file?.buffer?.length,
   })
-  console.log('[UPLOAD] req.headers:', req.headers)
+  console.log('[UPLOAD] Authorization 头:', req.headers.authorization ? '存在' : '缺失')
   console.log('[UPLOAD] req.body:', req.body)
   try {
     const user = getUserFromToken(req)

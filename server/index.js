@@ -56,10 +56,20 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: '药天下后端服务运行正常', time: new Date().toISOString() })
 })
 
-// 生产环境：托管前端静态文件
+// Bug Fix #1: 优化静态文件托管配置
 const distPath = path.join(__dirname, '../dist')
+const downloadsPath = path.join(__dirname, '../public/downloads')
+
+// 确保上传目录存在
+if (!require('fs').existsSync(downloadsPath)) {
+  require('fs').mkdirSync(downloadsPath, { recursive: true })
+  console.log(`[SERVER] 创建上传目录: ${downloadsPath}`)
+}
+
+// 托管前端静态文件
 app.use(express.static(distPath))
-app.use('/downloads', express.static(path.join(__dirname, '../public/downloads')))
+// Bug Fix #1: 添加上传目录的静态文件托管，便前端下载
+app.use('/downloads', express.static(downloadsPath))
 app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
