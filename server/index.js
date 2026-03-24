@@ -85,7 +85,9 @@ app.use('/downloads', express.static(downloadsPath))
 // 必须使用 (.*) 或 :path(*) 来匹配所有路径
 // Bug Fix #7: 使用正则表达式匹配所有路由
 // 这是 Express 5.x 中最稳定的 SPA 通配符方案
-app.get(/^(?!\/api).*/, (req, res) => {
+// Bug Fix #8: 修复正则表达式，排除 /downloads 和 /api 路由
+// 只有不匹配这些前缀的请求才会被重定向到 index.html
+app.get(/^(?!\/api|\/downloads).*/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
 

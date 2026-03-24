@@ -221,13 +221,20 @@ router.get('/uploads/:id/download', async (req, res) => {
       return res.status(404).json({ success: false, message: '文件已删除或不存在' })
     }
 
-    // 构建完整的物理路径
-    const fullPath = path.join(__dirname, '../public', file_path)
+    // Bug Fix #8: 修正路径构建逻辑
+    // file_path = /downloads/1774333596079_filename.pdf
+    // 应该指向 server/public/downloads/1774333596079_filename.pdf
+    // 而不是 server/public/downloads/downloads/1774333596079_filename.pdf
+    // 所以需要从 file_path 中去掉前缀 /downloads
+    const relativePath = file_path.startsWith('/downloads/')
+      ? file_path.slice(10)
+      : file_path
+    const fullPath = path.join(__dirname, '../public/downloads', relativePath)
 
     // 设置正确的响应头，确保中文文件名正确显示
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file_name)}`)
 
-    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}，路径=${fullPath}`)
+    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}，数据库路径=${file_path}，物理路径=${fullPath}`)
 
     // 使用 res.sendFile 下载文件（最稳定的方案）
     res.sendFile(fullPath, (err) => {
