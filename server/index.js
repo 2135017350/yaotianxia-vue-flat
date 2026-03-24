@@ -80,7 +80,10 @@ app.use('/downloads', express.static(downloadsPath))
 // Bug Fix #4: SPA 通配符路由必须放在最后
 // 这样所有真实的文件请求都会被静态文件中间件处理
 // 只有不存在的路由才会被重定向到 index.html
-app.get('/*', (req, res) => {
+// Bug Fix #6: 修复 Express 5.x 中的路由通配符语法
+// Express 5.x 使用 path-to-regexp 8.x，不再支持 /* 写法
+// 必须使用 (.*) 或 :path(*) 来匹配所有路径
+app.get('/:path(.*)', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
 
