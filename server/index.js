@@ -4,6 +4,7 @@ import session from 'express-session'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
+import fs from 'fs'
 import captchaRouter from './routes/captcha.js'
 import authRouter from './routes/auth.js'
 import formsRouter from './routes/forms.js'
@@ -60,9 +61,9 @@ app.get('/api/health', (req, res) => {
 const distPath = path.join(__dirname, '../dist')
 const downloadsPath = path.join(__dirname, '../public/downloads')
 
-// 确保上传目录存在
-if (!require('fs').existsSync(downloadsPath)) {
-  require('fs').mkdirSync(downloadsPath, { recursive: true })
+// Bug Fix #3: 修复 ES Module 兑容性错误，使用 fs 对象而不是 require
+if (!fs.existsSync(downloadsPath)) {
+  fs.mkdirSync(downloadsPath, { recursive: true })
   console.log(`[SERVER] 创建上传目录: ${downloadsPath}`)
 }
 
