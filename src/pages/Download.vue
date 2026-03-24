@@ -85,11 +85,25 @@
               </div>
               <div class="flex items-center gap-2 flex-shrink-0 ml-4">
                 <span :class="['text-xs', isDark ? 'text-white/40' : 'text-gray-400']">{{ file.size }}</span>
+                <!-- Bug Fix #5: 修复前端下载逻辑，使用 API 端点而不是直接链接 -->
+                <!-- 对于管理员上传的资源（有 id），使用 API 下载端点 -->
+                <!-- 对于默认资源（无 id），使用直接链接到 /downloads 目录 -->
                 <a
+                  v-if="file.id"
+                  :href="`/api/uploads/${file.id}/download`"
+                  :download="file.name"
+                  class="text-xs px-4 py-1.5 rounded-lg font-medium transition-all"
+                  :style="isDark ? 'background: rgba(0,212,255,0.15); color: #00D4FF; border: 1px solid rgba(0,212,255,0.3)' : 'background: rgba(0,100,200,0.08); color: #0066CC; border: 1px solid rgba(0,100,200,0.2)'"
+                  @click="handleDownloadError"
+                >下载</a>
+                <!-- 默认资源直接从 /downloads 目录下载 -->
+                <a
+                  v-else
                   :href="'/downloads/' + file.name"
                   :download="file.name"
                   class="text-xs px-4 py-1.5 rounded-lg font-medium transition-all"
                   :style="isDark ? 'background: rgba(0,212,255,0.15); color: #00D4FF; border: 1px solid rgba(0,212,255,0.3)' : 'background: rgba(0,100,200,0.08); color: #0066CC; border: 1px solid rgba(0,100,200,0.2)'"
+                  @click="handleDownloadError"
                 >下载</a>
                 <button v-if="isAdmin && file.id" @click="deleteFileFromGroup(group.title, file)" class="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200">删除</button>
               </div>
@@ -235,6 +249,26 @@ async function deleteFileFromGroup(groupTitle: string, file: any) {
   if (!group) return
   group.files = group.files.filter((f: any) => f.name !== file.name)
   saveDownloadGroups()
+}
+
+// Bug Fix #5: 添加错误处理，防止下载 HTML 内容
+// 当下载请求返回 HTML 时，说明 SPA 路由拦截了请求
+async function handleDownloadError(event: Event) {
+  const link = event.target as HTMLAnchorElement
+  if (!link) return
+  
+  try {
+    const response = await fetch(link.href, { method: 'HEAD', credentials: 'include' })
+    const contentType = response.headers.get('content-type') || ''
+    
+    // 如果返回的是 HTML，说明文件不存在或路由被拦截
+    if (contentType.includes('text/html')) {
+      event.preventDefault()
+      alert('文件不存在或无法下载，请检查文件是否已被删除')
+    }
+  } catch (error) {
+    console.warn('下载前检查失败:', error)
+  }
 }
 
 const showUploadModal = ref(false)

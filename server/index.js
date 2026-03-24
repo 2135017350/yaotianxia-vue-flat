@@ -67,11 +67,20 @@ if (!fs.existsSync(downloadsPath)) {
   console.log(`[SERVER] 创建上传目录: ${downloadsPath}`)
 }
 
+// Bug Fix #4: 修复 SPA 路由顺序问题
+// 必须先托管所有静态文件和 API 路由，再处理 SPA 通配符路由
+// 否则文件下载请求会被 SPA 路由拦截并返回 HTML 内容
+
 // 托管前端静态文件
 app.use(express.static(distPath))
+
 // Bug Fix #1: 添加上传目录的静态文件托管，便前端下载
 app.use('/downloads', express.static(downloadsPath))
-app.get('/{*splat}', (req, res) => {
+
+// Bug Fix #4: SPA 通配符路由必须放在最后
+// 这样所有真实的文件请求都会被静态文件中间件处理
+// 只有不存在的路由才会被重定向到 index.html
+app.get('/*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
 
