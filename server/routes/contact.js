@@ -31,24 +31,29 @@ router.post('/contact', async (req, res) => {
     // 导入数据库模块
     const { default: db } = await import('../db.js')
 
-    // 插入数据库
+    // 插入数据库（使用 OUTPUT 子句获取插入的 ID）
     console.log('[CONTACT] 准备插入数据库...')
     const [result] = await db.query(
-      'INSERT INTO contact_messages (name, email, phone, company, subject, message, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO contact_messages (name, email, phone, company, subject, message, status) 
+       OUTPUT INSERTED.id 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [name, email, phone || null, company || null, subject, message, 'unread']
     )
     console.log('[CONTACT] 数据库插入结果:', result)
 
-    // SQL Server 返回的 ID 在 result.recordset 中
+    // 从 OUTPUT 子句获取插入的 ID
     let contactId = null
     if (result.recordset && result.recordset[0]) {
       contactId = result.recordset[0].id
+      console.log(`[CONTACT] 从 OUTPUT 子句获取 ID: ${contactId}`)
     } else if (result.insertId) {
       contactId = result.insertId
+      console.log(`[CONTACT] 从 insertId 获取 ID: ${contactId}`)
     }
 
     if (!contactId) {
       console.error('[CONTACT] 数据库插入失败: 无法获取插入的 ID')
+      console.error('[CONTACT] result 对象:', result)
       return res.status(500).json({
         success: false,
         message: '提交失败，请稍后重试'

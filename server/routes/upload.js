@@ -129,22 +129,27 @@ router.post('/upload', (req, res, next) => {
     // 导入 db 模块
     const { default: db } = await import('../db.js')
 
-    // 将文件信息存入数据库
+    // 将文件信息存入数据库（使用 OUTPUT 子句获取插入的 ID）
     const [result] = await db.query(
-      'INSERT INTO download_resources (name, description, size, file_name, file_path, type, media_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO download_resources (name, description, size, file_name, file_path, type, media_type, created_by) 
+       OUTPUT INSERTED.id 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [fileName, description || '', fileSize, fileName, storageResult.path, type, req.file.mimetype, user.id]
     )
 
-    // SQL Server 返回的 ID 在 result.recordset 中
+    // 从 OUTPUT 子句获取插入的 ID
     let insertedId = null
     if (result.recordset && result.recordset[0]) {
       insertedId = result.recordset[0].id
+      console.log(`[UPLOAD] 从 OUTPUT 子句获取 ID: ${insertedId}`)
     } else if (result.insertId) {
       insertedId = result.insertId
+      console.log(`[UPLOAD] 从 insertId 获取 ID: ${insertedId}`)
     }
 
     if (!insertedId) {
       console.error('[UPLOAD] 数据库插入失败：无法获取插入的 ID')
+      console.error('[UPLOAD] result 对象:', result)
       // 删除已保存的文件
       await storageService.deleteFile(storageResult.path).catch(err => {
         console.error('[UPLOAD] 删除文件失败:', err)
