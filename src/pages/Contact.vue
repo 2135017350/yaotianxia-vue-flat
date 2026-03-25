@@ -181,6 +181,7 @@ async function handleSubmit() {
   loading.value = true
   errorMessage.value = ''
 
+  console.log('[DEBUG] 准备提交留言:', form.value)
   try {
     const response = await fetch('/api/contact', {
       method: 'POST',
@@ -198,7 +199,9 @@ async function handleSubmit() {
       credentials: 'include',
     })
 
+    console.log('[DEBUG] 收到响应:', response.status, response.statusText)
     const data = await response.json()
+    console.log('[DEBUG] 响应数据:', data)
 
     if (!data.success) {
       errorMessage.value = data.message || '提交失败，请稍后重试'

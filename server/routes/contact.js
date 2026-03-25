@@ -5,6 +5,7 @@ const router = express.Router()
 
 // 提交联系信息
 router.post('/contact', async (req, res) => {
+  console.log('[DEBUG] 收到联系请求:', req.body)
   try {
     const { name, email, phone, company, subject, message } = req.body
 
@@ -29,10 +30,12 @@ router.post('/contact', async (req, res) => {
     const { default: db } = await import('../db.js')
 
     // 插入数据库
+    console.log('[DEBUG] 准备插入数据库...')
     const [result] = await db.query(
       'INSERT INTO contact_messages (name, email, phone, company, subject, message) VALUES (?, ?, ?, ?, ?, ?)',
       [name, email, phone || null, company || null, subject, message]
     )
+    console.log('[DEBUG] 数据库插入结果:', result)
 
     if (!result || !result.insertId) {
       return res.status(500).json({
