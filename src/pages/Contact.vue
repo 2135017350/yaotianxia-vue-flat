@@ -50,7 +50,7 @@
         <!-- 在线咨询表单 -->
         <div>
           <h2 :class="['text-2xl font-bold mb-8', isDark ? 'text-white' : 'text-gray-900']">在线咨询</h2>
-          <form class="glass-card rounded-2xl p-8 space-y-5" @submit.prevent="handleSubmit">
+          <div class="glass-card rounded-2xl p-8 space-y-5">
             <!-- 成功提示 -->
             <div v-if="submitted" :class="['p-4 rounded-lg text-sm flex items-center gap-3', isDark ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-green-50 text-green-600 border border-green-200']">
               <span class="text-lg">✓</span>
@@ -134,10 +134,15 @@
               ></textarea>
             </div>
 
-            <button type="submit" :disabled="loading || submitted" class="btn-primary w-full py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+            <button 
+              type="button" 
+              @click="handleSubmit"
+              :disabled="loading || submitted" 
+              class="btn-primary w-full py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
               {{ loading ? '提交中...' : submitted ? '✓ 提交成功' : '提交咨询' }}
             </button>
-          </form>
+          </div>
         </div>
       </div>
     </section>
@@ -145,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import Layout from '../components/common/Layout.vue'
 import { useTheme } from '../composables/useTheme'
 
@@ -164,10 +169,17 @@ const form = ref({
   message: ''
 })
 
+onMounted(() => {
+  console.log('[DEBUG] 联系我们页面已加载')
+})
+
 async function handleSubmit() {
+  console.log('[DEBUG] handleSubmit 被触发')
+  
   // 基本验证
   if (!form.value.name || !form.value.email || !form.value.subject || !form.value.message) {
     errorMessage.value = '请填写所有必填项'
+    console.warn('[DEBUG] 验证失败: 必填项缺失')
     return
   }
 
@@ -175,13 +187,15 @@ async function handleSubmit() {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(form.value.email)) {
     errorMessage.value = '请输入有效的邮箱地址'
+    console.warn('[DEBUG] 验证失败: 邮箱格式错误')
     return
   }
 
   loading.value = true
   errorMessage.value = ''
 
-  console.log('[DEBUG] 准备提交留言:', form.value)
+  console.log('[DEBUG] 准备提交留言:', JSON.parse(JSON.stringify(form.value)))
+  
   try {
     const response = await fetch('/api/contact', {
       method: 'POST',
@@ -199,7 +213,7 @@ async function handleSubmit() {
       credentials: 'include',
     })
 
-    console.log('[DEBUG] 收到响应:', response.status, response.statusText)
+    console.log('[DEBUG] 收到响应状态:', response.status, response.statusText)
     const data = await response.json()
     console.log('[DEBUG] 响应数据:', data)
 
@@ -221,6 +235,7 @@ async function handleSubmit() {
     // 5秒后隐藏成功提示
     setTimeout(() => { submitted.value = false }, 5000)
   } catch (error) {
+    console.error('[DEBUG] 提交过程中发生错误:', error)
     errorMessage.value = error instanceof Error ? error.message : '网络错误，请稍后重试'
   } finally {
     loading.value = false
