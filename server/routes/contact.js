@@ -1,4 +1,5 @@
 import express from 'express'
+import MailService from '../services/MailService.js'
 
 const router = express.Router()
 
@@ -40,16 +41,26 @@ router.post('/contact', async (req, res) => {
       })
     }
 
-    console.log(`[CONTACT] 新的联系信息，ID=${result.insertId}，来自=${name} (${email})`)
+    const contactId = result.insertId
+    console.log(`[CONTACT] 新的联系信息，ID=${contactId}，来自=${name} (${email})`)
 
-    // 这里可以添加发送邮件通知客服的逻辑
-    // 例如：await sendEmailToCustomerService(name, email, subject, message)
+    // 异步发送邮件通知（不阻塞响应）
+    MailService.sendContactNotification({
+      name,
+      email,
+      phone,
+      company,
+      subject,
+      message
+    }).catch(error => {
+      console.error(`[CONTACT] 邮件发送失败: ${error.message}`)
+    })
 
     res.json({
       success: true,
       message: '感谢您的留言，我们会尽快与您联系！',
       data: {
-        id: result.insertId,
+        id: contactId,
         timestamp: new Date().toISOString()
       }
     })
@@ -129,6 +140,22 @@ router.post('/contact/:id/reply', async (req, res) => {
       })
     }
 
+    // 先获取原始联系信息
+    const [rows] = await db.query(
+      'SELECT name, email, subject FROM contact_messages WHERE id = ?',
+      [id]
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '消息不存在'
+      })
+    }
+
+    const contactData = rows[0]
+
+    // 更新数据库
     const [result] = await db.query(
       'UPDATE contact_messages SET status = ?, reply_message = ?, replied_at = NOW() WHERE id = ?',
       ['replied', reply_message, id]
@@ -143,9 +170,14 @@ router.post('/contact/:id/reply', async (req, res) => {
 
     console.log(`[CONTACT] 消息已回复，ID=${id}`)
 
+    // 异步发送回复邮件给客户
+    MailService.sendReplyNotification(contactData, reply_message).catch(error => {
+      console.error(`[CONTACT] 回复邮件发送失败: ${error.message}`)
+    })
+
     res.json({
       success: true,
-      message: '回复成功'
+      message: '回复成功，已发送邮件给客户'
     })
   } catch (error) {
     console.error('[CONTACT] 回复错误:', error)
