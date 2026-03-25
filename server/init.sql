@@ -93,6 +93,22 @@ CREATE TABLE news (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 9. 联系我们表
+DROP TABLE IF EXISTS contact_messages;
+CREATE TABLE contact_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL COMMENT '联系人姓名',
+  email VARCHAR(100) NOT NULL COMMENT '电子邮箱',
+  phone VARCHAR(20) COMMENT '电话号码',
+  company VARCHAR(200) COMMENT '公司名称',
+  subject VARCHAR(200) NOT NULL COMMENT '主题',
+  message LONGTEXT NOT NULL COMMENT '留言内容',
+  status ENUM('unread', 'read', 'replied') DEFAULT 'unread' COMMENT '状态',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  replied_at TIMESTAMP NULL COMMENT '回复时间',
+  reply_message LONGTEXT COMMENT '回复内容'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 9. 插入示例企业动态（避免重复插入）
 INSERT IGNORE INTO news (title, summary, category, published_at) VALUES
 ('药天下科技荣获2024年度医药行业优秀软件奖', '北京药天下科技有限公司凭借在医药管理软件领域14年的深耕，荣获2024年度医药行业优秀软件奖。', '企业动态', '2024-12-15 10:00:00'),

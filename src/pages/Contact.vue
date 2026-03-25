@@ -51,62 +51,91 @@
         <div>
           <h2 :class="['text-2xl font-bold mb-8', isDark ? 'text-white' : 'text-gray-900']">在线咨询</h2>
           <form class="glass-card rounded-2xl p-8 space-y-5" @submit.prevent="handleSubmit">
+            <!-- 成功提示 -->
+            <div v-if="submitted" :class="['p-4 rounded-lg text-sm flex items-center gap-3', isDark ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-green-50 text-green-600 border border-green-200']">
+              <span class="text-lg">✓</span>
+              <div>
+                <div class="font-medium">提交成功！</div>
+                <div class="text-xs opacity-80">感谢您的留言，我们会尽快与您联系。</div>
+              </div>
+            </div>
+
+            <!-- 错误提示 -->
+            <div v-if="errorMessage" :class="['p-4 rounded-lg text-sm flex items-center gap-3', isDark ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-red-50 text-red-600 border border-red-200']">
+              <span class="text-lg">✕</span>
+              <div>{{ errorMessage }}</div>
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label :class="['block text-sm mb-1.5', isDark ? 'text-white/70' : 'text-gray-600']">您的姓名 *</label>
+                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">您的姓名 <span class="text-red-500">*</span></label>
                 <input
                   v-model="form.name"
                   type="text"
                   placeholder="请输入姓名"
-                  required
-                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500']"
+                  :disabled="loading"
+                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
                 />
               </div>
               <div>
-                <label :class="['block text-sm mb-1.5', isDark ? 'text-white/70' : 'text-gray-600']">联系电话 *</label>
+                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">电子邮箱 <span class="text-red-500">*</span></label>
+                <input
+                  v-model="form.email"
+                  type="email"
+                  placeholder="请输入邮箱"
+                  :disabled="loading"
+                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">联系电话</label>
                 <input
                   v-model="form.phone"
                   type="tel"
                   placeholder="请输入手机号"
-                  required
-                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500']"
+                  :disabled="loading"
+                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
+                />
+              </div>
+              <div>
+                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">公司名称</label>
+                <input
+                  v-model="form.company"
+                  type="text"
+                  placeholder="请输入公司名称"
+                  :disabled="loading"
+                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
                 />
               </div>
             </div>
+
             <div>
-              <label :class="['block text-sm mb-1.5', isDark ? 'text-white/70' : 'text-gray-600']">公司名称</label>
+              <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">咨询主题 <span class="text-red-500">*</span></label>
               <input
-                v-model="form.company"
+                v-model="form.subject"
                 type="text"
-                placeholder="请输入公司名称"
-                :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500']"
+                placeholder="请输入咨询主题"
+                :disabled="loading"
+                :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
               />
             </div>
+
             <div>
-              <label :class="['block text-sm mb-1.5', isDark ? 'text-white/70' : 'text-gray-600']">感兴趣的产品</label>
-              <select
-                v-model="form.product"
-                :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white focus:border-primary' : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-blue-500']"
-              >
-                <option value="">请选择产品</option>
-                <option value="erp">药天下ERP+WMS</option>
-                <option value="his">深度HIS系统</option>
-                <option value="elder">智慧养老平台</option>
-                <option value="code">流通码中台</option>
-                <option value="other">其他产品</option>
-              </select>
-            </div>
-            <div>
-              <label :class="['block text-sm mb-1.5', isDark ? 'text-white/70' : 'text-gray-600']">咨询内容</label>
+              <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">咨询内容 <span class="text-red-500">*</span></label>
               <textarea
                 v-model="form.message"
                 rows="4"
-                placeholder="请描述您的需求或问题..."
-                :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors resize-none', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500']"
+                placeholder="请详细描述您的需求或问题..."
+                :disabled="loading"
+                :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors resize-none', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
               ></textarea>
             </div>
-            <button type="submit" class="btn-primary w-full py-3 text-base">
-              {{ submitted ? '✓ 提交成功，我们将尽快联系您' : '提交咨询' }}
+
+            <button type="submit" :disabled="loading || submitted" class="btn-primary w-full py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+              {{ loading ? '提交中...' : submitted ? '✓ 提交成功' : '提交咨询' }}
             </button>
           </form>
         </div>
@@ -124,11 +153,75 @@ const { theme } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
 
 const submitted = ref(false)
-const form = ref({ name: '', phone: '', company: '', product: '', message: '' })
+const loading = ref(false)
+const errorMessage = ref('')
+const form = ref({
+  name: '',
+  email: '',
+  phone: '',
+  company: '',
+  subject: '',
+  message: ''
+})
 
-function handleSubmit() {
-  submitted.value = true
-  setTimeout(() => { submitted.value = false }, 5000)
+async function handleSubmit() {
+  // 基本验证
+  if (!form.value.name || !form.value.email || !form.value.subject || !form.value.message) {
+    errorMessage.value = '请填写所有必填项'
+    return
+  }
+
+  // 邮箱格式验证
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(form.value.email)) {
+    errorMessage.value = '请输入有效的邮箱地址'
+    return
+  }
+
+  loading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch('/api/contact', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: form.value.name,
+        email: form.value.email,
+        phone: form.value.phone || undefined,
+        company: form.value.company || undefined,
+        subject: form.value.subject,
+        message: form.value.message,
+      }),
+      credentials: 'include',
+    })
+
+    const data = await response.json()
+
+    if (!data.success) {
+      errorMessage.value = data.message || '提交失败，请稍后重试'
+      return
+    }
+
+    submitted.value = true
+    form.value = {
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      subject: '',
+      message: ''
+    }
+    
+    // 5秒后隐藏成功提示
+    setTimeout(() => { submitted.value = false }, 5000)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '网络错误，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 const contactInfos = [

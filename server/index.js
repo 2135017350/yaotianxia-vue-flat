@@ -9,6 +9,7 @@ import captchaRouter from './routes/captcha.js'
 import authRouter from './routes/auth.js'
 import formsRouter from './routes/forms.js'
 import uploadRouter from './routes/upload.js'
+import contactRouter from './routes/contact.js'
 
 dotenv.config()
 
@@ -46,6 +47,7 @@ app.use('/api', captchaRouter)
 app.use('/api/auth', authRouter)
 app.use('/api', formsRouter)
 app.use('/api', uploadRouter)
+app.use('/api', contactRouter)
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: '药天下后端服务运行正常', time: new Date().toISOString() })
