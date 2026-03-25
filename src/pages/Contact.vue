@@ -50,9 +50,9 @@
         <!-- 在线咨询表单 -->
         <div>
           <h2 :class="['text-2xl font-bold mb-8', isDark ? 'text-white' : 'text-gray-900']">在线咨询</h2>
-          <div class="glass-card rounded-2xl p-8 space-y-5">
+          <div :class="['rounded-2xl p-8 space-y-5', isDark ? 'bg-brand-surface border border-brand-border' : 'bg-gray-50 border border-gray-200']">
             <!-- 成功提示 -->
-            <div v-if="submitted" :class="['p-4 rounded-lg text-sm flex items-center gap-3', isDark ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-green-50 text-green-600 border border-green-200']">
+            <div v-if="success" :class="['p-4 rounded-lg text-sm flex items-center gap-3', isDark ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-green-50 text-green-600 border border-green-200']">
               <span class="text-lg">✓</span>
               <div>
                 <div class="font-medium">提交成功！</div>
@@ -61,87 +61,92 @@
             </div>
 
             <!-- 错误提示 -->
-            <div v-if="errorMessage" :class="['p-4 rounded-lg text-sm flex items-center gap-3', isDark ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-red-50 text-red-600 border border-red-200']">
+            <div v-if="error" :class="['p-4 rounded-lg text-sm flex items-center gap-3', isDark ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-red-50 text-red-600 border border-red-200']">
               <span class="text-lg">✕</span>
-              <div>{{ errorMessage }}</div>
+              <div>{{ error }}</div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <form @submit.prevent="handleSubmit" class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label :class="labelClass">您的姓名 <span class="text-red-500">*</span></label>
+                  <input
+                    v-model="form.name"
+                    type="text"
+                    placeholder="请输入姓名"
+                    :disabled="loading"
+                    :class="inputClass"
+                    required
+                  />
+                </div>
+                <div>
+                  <label :class="labelClass">电子邮箱 <span class="text-red-500">*</span></label>
+                  <input
+                    v-model="form.email"
+                    type="email"
+                    placeholder="请输入邮箱"
+                    :disabled="loading"
+                    :class="inputClass"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label :class="labelClass">联系电话</label>
+                  <input
+                    v-model="form.phone"
+                    type="tel"
+                    placeholder="请输入手机号"
+                    :disabled="loading"
+                    :class="inputClass"
+                  />
+                </div>
+                <div>
+                  <label :class="labelClass">公司名称</label>
+                  <input
+                    v-model="form.company"
+                    type="text"
+                    placeholder="请输入公司名称"
+                    :disabled="loading"
+                    :class="inputClass"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">您的姓名 <span class="text-red-500">*</span></label>
+                <label :class="labelClass">咨询主题 <span class="text-red-500">*</span></label>
                 <input
-                  v-model="form.name"
+                  v-model="form.subject"
                   type="text"
-                  placeholder="请输入姓名"
+                  placeholder="请输入咨询主题"
                   :disabled="loading"
-                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
+                  :class="inputClass"
+                  required
                 />
               </div>
+
               <div>
-                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">电子邮箱 <span class="text-red-500">*</span></label>
-                <input
-                  v-model="form.email"
-                  type="email"
-                  placeholder="请输入邮箱"
+                <label :class="labelClass">咨询内容 <span class="text-red-500">*</span></label>
+                <textarea
+                  v-model="form.message"
+                  rows="4"
+                  placeholder="请详细描述您的需求或问题..."
                   :disabled="loading"
-                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
-                />
+                  :class="[inputClass, 'resize-none']"
+                  required
+                ></textarea>
               </div>
-            </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">联系电话</label>
-                <input
-                  v-model="form.phone"
-                  type="tel"
-                  placeholder="请输入手机号"
-                  :disabled="loading"
-                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
-                />
-              </div>
-              <div>
-                <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">公司名称</label>
-                <input
-                  v-model="form.company"
-                  type="text"
-                  placeholder="请输入公司名称"
-                  :disabled="loading"
-                  :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">咨询主题 <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.subject"
-                type="text"
-                placeholder="请输入咨询主题"
-                :disabled="loading"
-                :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
-              />
-            </div>
-
-            <div>
-              <label :class="['block text-sm mb-1.5 font-medium', isDark ? 'text-white/70' : 'text-gray-600']">咨询内容 <span class="text-red-500">*</span></label>
-              <textarea
-                v-model="form.message"
-                rows="4"
-                placeholder="请详细描述您的需求或问题..."
-                :disabled="loading"
-                :class="['w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors resize-none', isDark ? 'bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-primary disabled:opacity-50' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 disabled:opacity-50']"
-              ></textarea>
-            </div>
-
-            <button 
-              type="button" 
-              @click="handleSubmit"
-              :disabled="loading || submitted" 
-              class="btn-primary w-full py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {{ loading ? '提交中...' : submitted ? '✓ 提交成功' : '提交咨询' }}
-            </button>
+              <button 
+                type="submit" 
+                :disabled="loading || success" 
+                :class="['w-full btn-primary py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all']"
+              >
+                {{ loading ? '提交中...' : success ? '✓ 提交成功' : '提交咨询' }}
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -150,16 +155,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import Layout from '../components/common/Layout.vue'
 import { useTheme } from '../composables/useTheme'
 
 const { theme } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
 
-const submitted = ref(false)
-const loading = ref(false)
-const errorMessage = ref('')
 const form = ref({
   name: '',
   email: '',
@@ -169,74 +171,55 @@ const form = ref({
   message: ''
 })
 
-onMounted(() => {
-  console.log('[DEBUG] 联系我们页面已加载')
-})
+const loading = ref(false)
+const error = ref('')
+const success = ref('')
+
+const labelClass = computed(() => ['block text-sm font-medium mb-1.5', isDark.value ? 'text-white/70' : 'text-gray-600'])
+const inputClass = computed(() => [
+  'w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-all border',
+  isDark.value
+    ? 'bg-white/5 border-brand-border text-white placeholder-white/30 focus:border-primary disabled:opacity-50'
+    : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white disabled:opacity-50'
+])
 
 async function handleSubmit() {
-  console.log('[DEBUG] handleSubmit 被触发')
-  
-  // 基本验证
-  if (!form.value.name || !form.value.email || !form.value.subject || !form.value.message) {
-    errorMessage.value = '请填写所有必填项'
-    console.warn('[DEBUG] 验证失败: 必填项缺失')
-    return
-  }
-
-  // 邮箱格式验证
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(form.value.email)) {
-    errorMessage.value = '请输入有效的邮箱地址'
-    console.warn('[DEBUG] 验证失败: 邮箱格式错误')
-    return
-  }
-
+  error.value = ''
+  success.value = ''
   loading.value = true
-  errorMessage.value = ''
-
-  console.log('[DEBUG] 准备提交留言:', JSON.parse(JSON.stringify(form.value)))
   
   try {
-    const response = await fetch('/api/contact', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: form.value.name,
-        email: form.value.email,
-        phone: form.value.phone || undefined,
-        company: form.value.company || undefined,
-        subject: form.value.subject,
-        message: form.value.message,
-      }),
-      credentials: 'include',
-    })
-
-    console.log('[DEBUG] 收到响应状态:', response.status, response.statusText)
-    const data = await response.json()
-    console.log('[DEBUG] 响应数据:', data)
-
-    if (!data.success) {
-      errorMessage.value = data.message || '提交失败，请稍后重试'
-      return
-    }
-
-    submitted.value = true
-    form.value = {
-      name: '',
-      email: '',
-      phone: '',
-      company: '',
-      subject: '',
-      message: ''
-    }
+    const API_BASE = (import.meta.env.VITE_API_URL || '/api')
+    console.log('[DEBUG] 准备提交到:', `${API_BASE}/contact`)
+    console.log('[DEBUG] 表单数据:', form.value)
     
-    // 5秒后隐藏成功提示
-    setTimeout(() => { submitted.value = false }, 5000)
-  } catch (error) {
-    console.error('[DEBUG] 提交过程中发生错误:', error)
-    errorMessage.value = error instanceof Error ? error.message : '网络错误，请稍后重试'
+    try {
+      const res = await fetch(`${API_BASE}/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(form.value),
+        signal: AbortSignal.timeout(5000),
+      })
+      
+      console.log('[DEBUG] 响应状态:', res.status, res.statusText)
+      const data = await res.json()
+      console.log('[DEBUG] 响应数据:', data)
+      
+      if (data.success) {
+        success.value = data.message || '感谢您的留言，我们会尽快与您联系！'
+        form.value = { name: '', email: '', phone: '', company: '', subject: '', message: '' }
+        // 3秒后清除成功提示
+        setTimeout(() => { success.value = '' }, 3000)
+      } else {
+        error.value = data.message || '提交失败，请稍后重试'
+      }
+      return
+    } catch (fetchErr) {
+      console.error('[DEBUG] 网络请求失败:', fetchErr)
+      error.value = '网络连接失败，请检查后端服务是否运行'
+      throw fetchErr
+    }
   } finally {
     loading.value = false
   }

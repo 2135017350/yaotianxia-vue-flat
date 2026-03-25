@@ -5,12 +5,13 @@ const router = express.Router()
 
 // 提交联系信息
 router.post('/contact', async (req, res) => {
-  console.log('[DEBUG] 收到联系请求:', req.body)
+  console.log('[CONTACT] 收到联系请求:', req.body)
   try {
     const { name, email, phone, company, subject, message } = req.body
 
     // 基本验证
     if (!name || !email || !subject || !message) {
+      console.warn('[CONTACT] 验证失败: 必填项缺失')
       return res.status(400).json({
         success: false,
         message: '请填写必填项：姓名、邮箱、主题、留言内容'
@@ -20,6 +21,7 @@ router.post('/contact', async (req, res) => {
     // 邮箱格式验证
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
+      console.warn('[CONTACT] 验证失败: 邮箱格式错误')
       return res.status(400).json({
         success: false,
         message: '请输入有效的邮箱地址'
@@ -30,14 +32,15 @@ router.post('/contact', async (req, res) => {
     const { default: db } = await import('../db.js')
 
     // 插入数据库
-    console.log('[DEBUG] 准备插入数据库...')
+    console.log('[CONTACT] 准备插入数据库...')
     const [result] = await db.query(
-      'INSERT INTO contact_messages (name, email, phone, company, subject, message) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, email, phone || null, company || null, subject, message]
+      'INSERT INTO contact_messages (name, email, phone, company, subject, message, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, email, phone || null, company || null, subject, message, 'unread']
     )
-    console.log('[DEBUG] 数据库插入结果:', result)
+    console.log('[CONTACT] 数据库插入结果:', result)
 
     if (!result || !result.insertId) {
+      console.error('[CONTACT] 数据库插入失败: insertId 为空')
       return res.status(500).json({
         success: false,
         message: '提交失败，请稍后重试'
@@ -48,7 +51,9 @@ router.post('/contact', async (req, res) => {
     console.log(`[CONTACT] 新的联系信息，ID=${contactId}，来自=${name} (${email})`)
 
     // 异步发送邮件通知（不阻塞响应）
+    // 即使邮件发送失败，也已经成功存入数据库，所以返回成功
     MailService.sendContactNotification({
+      id: contactId,
       name,
       email,
       phone,
