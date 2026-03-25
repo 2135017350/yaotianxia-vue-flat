@@ -5,7 +5,6 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
 import fs from 'fs'
-import history from 'connect-history-api-fallback'
 import captchaRouter from './routes/captcha.js'
 import authRouter from './routes/auth.js'
 import formsRouter from './routes/forms.js'
@@ -68,27 +67,51 @@ if (!fs.existsSync(downloadsPath)) {
   console.log(`[SERVER] 创建上传目录: ${downloadsPath}`)
 }
 
-// Bug Fix #9: 使用工业标准方案 connect-history-api-fallback
-// 这个中间件能智慧地处理 SPA 路由，自动排除静态文件和 API 路由
-const historyFallback = history({
-  disableDotRule: false,
-  rewrites: [
-    // 所有 /api 路由不重写
-    { from: /^\/api\/.*$/, to: (context) => context.parsedUrl.pathname },
-    // 所有 /downloads 路由不重写
-    { from: /^\/downloads\/.*$/, to: (context) => context.parsedUrl.pathname },
-  ]
-})
-
 // 托管前端静态文件
 app.use(express.static(distPath))
 
 // Bug Fix #1: 添加上传目录的静态文件托管，便前端下载
 app.use('/downloads', express.static(downloadsPath))
 
-// Bug Fix #9: 使用 connect-history-api-fallback 中间件处理 SPA 路由
-// 此中间件必须放在所有静态文件托管之后，以便不会拦截真实文件
-app.use(historyFallback)
+// Bug Fix #9: 使用自定义中间件处理 SPA 路由
+// 这个中间件能智慧地处理 SPA 路由，自动排除静态文件和 API 路由
+// 相比第三方库，自定义实现更加可靠且避免了 ESM/CommonJS 兼容性问题
+app.use((req, res, next) => {
+  // 如果请求以下前缀开头，直接跳过（不重定向到 index.html）
+  const skipPaths = [
+    '/api',           // API 路由
+    '/downloads',     // 文件下载
+    '/public',        // 公开资源
+    '.',              // 隐藏文件
+  ]
+
+  // 检查是否是静态文件（有文件扩展名）
+  const hasExtension = /\.\w+$/.test(req.path)
+  
+  // 检查是否应该跳过
+  const shouldSkip = skipPaths.some(prefix => req.path.startsWith(prefix)) || hasExtension
+
+  if (shouldSkip) {
+    // 继续处理，不重定向
+    return next()
+  }
+
+  // 检查文件是否真实存在
+  const filePath = path.join(distPath, req.path)
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    // 文件存在，继续处理
+    return next()
+  }
+
+  // 不是 API、文件下载、静态文件，且文件不存在
+  // 则重定向到 index.html（SPA 路由）
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) {
+      console.error(`[SPA] 重定向到 index.html 失败: ${err.message}`)
+      res.status(500).send('Internal Server Error')
+    }
+  })
+})
 
 // 最后再托管一遍前端静态文件（为了处理 SPA 路由后的文件请求）
 app.use(express.static(distPath))
