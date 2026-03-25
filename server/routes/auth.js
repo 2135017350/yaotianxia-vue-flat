@@ -1,9 +1,9 @@
-import { Router } from 'express'
+import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import db from '../db.js'
 
-const router = Router()
+const router = express.Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'yaotianxia_secret'
 
 // 生成 JWT Token
@@ -16,7 +16,6 @@ function generateToken(user) {
 }
 
 // 注册（邮箱或手机号）
-// 注意：验证码由前端 Canvas 验证，后端不再校验验证码
 router.post('/register', async (req, res) => {
   try {
     const { type, email, phone, password, username } = req.body
@@ -67,7 +66,8 @@ router.post('/register', async (req, res) => {
     }
 
     const [result] = await db.query(sql, params)
-    const userId = result.insertId
+    // SQL Server 返回的 insertId 在 result.recordset 中
+    const userId = result.recordset && result.recordset[0] ? result.recordset[0].id : result.insertId
 
     const token = generateToken({ id: userId, email: email || null, phone: phone || null })
     res.json({
@@ -84,13 +84,12 @@ router.post('/register', async (req, res) => {
       }
     })
   } catch (err) {
-    console.error('注册错误:', err)
+    console.error('[AUTH] 注册错误:', err)
     res.status(500).json({ success: false, message: '服务器错误，请稍后重试' })
   }
 })
 
 // 登录（支持邮箱、手机号、用户名三种方式）
-// 注意：验证码由前端 Canvas 验证，后端不再校验验证码
 router.post('/login', async (req, res) => {
   try {
     const { account, password } = req.body
@@ -103,13 +102,13 @@ router.post('/login', async (req, res) => {
     let rows
     if (account.includes('@')) {
       // 邮箱登录
-      ;[rows] = await db.query('SELECT * FROM users WHERE email = ?', [account])
+      [rows] = await db.query('SELECT * FROM users WHERE email = ?', [account])
     } else if (/^1[3-9]\d{9}$/.test(account)) {
       // 手机号登录
-      ;[rows] = await db.query('SELECT * FROM users WHERE phone = ?', [account])
+      [rows] = await db.query('SELECT * FROM users WHERE phone = ?', [account])
     } else {
       // 用户名登录
-      ;[rows] = await db.query('SELECT * FROM users WHERE username = ?', [account])
+      [rows] = await db.query('SELECT * FROM users WHERE username = ?', [account])
     }
 
     if (!rows || rows.length === 0) {
@@ -122,8 +121,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ success: false, message: '密码错误' })
     }
 
-    // 更新最后登录时间
-    await db.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id])
+    // 更新最后登录时间（SQL Server 使用 GETDATE()）
+    await db.query('UPDATE users SET last_login = GETDATE() WHERE id = ?', [user.id])
 
     const token = generateToken(user)
     res.json({
@@ -139,7 +138,7 @@ router.post('/login', async (req, res) => {
       }
     })
   } catch (err) {
-    console.error('登录错误:', err)
+    console.error('[AUTH] 登录错误:', err)
     res.status(500).json({ success: false, message: '服务器错误，请稍后重试' })
   }
 })
@@ -162,6 +161,7 @@ router.get('/me', async (req, res) => {
     }
     res.json({ success: true, user: rows[0] })
   } catch (err) {
+    console.error('[AUTH] Token 验证错误:', err)
     res.status(401).json({ success: false, message: 'Token 无效或已过期' })
   }
 })

@@ -39,15 +39,22 @@ router.post('/contact', async (req, res) => {
     )
     console.log('[CONTACT] 数据库插入结果:', result)
 
-    if (!result || !result.insertId) {
-      console.error('[CONTACT] 数据库插入失败: insertId 为空')
+    // SQL Server 返回的 ID 在 result.recordset 中
+    let contactId = null
+    if (result.recordset && result.recordset[0]) {
+      contactId = result.recordset[0].id
+    } else if (result.insertId) {
+      contactId = result.insertId
+    }
+
+    if (!contactId) {
+      console.error('[CONTACT] 数据库插入失败: 无法获取插入的 ID')
       return res.status(500).json({
         success: false,
         message: '提交失败，请稍后重试'
       })
     }
 
-    const contactId = result.insertId
     console.log(`[CONTACT] 新的联系信息，ID=${contactId}，来自=${name} (${email})`)
 
     // 异步发送邮件通知（不阻塞响应）
@@ -86,8 +93,9 @@ router.get('/contact/messages', async (req, res) => {
   try {
     const { default: db } = await import('../db.js')
 
+    // SQL Server 使用 TOP 替代 LIMIT
     const [rows] = await db.query(
-      'SELECT id, name, email, phone, company, subject, message, status, created_at FROM contact_messages ORDER BY created_at DESC LIMIT 100'
+      'SELECT TOP 100 id, name, email, phone, company, subject, message, status, created_at FROM contact_messages ORDER BY created_at DESC'
     )
 
     res.json({
@@ -114,7 +122,9 @@ router.put('/contact/:id/read', async (req, res) => {
       ['read', id]
     )
 
-    if (result.affectedRows === 0) {
+    // SQL Server 返回 rowsAffected 而不是 affectedRows
+    const affectedRows = result.rowsAffected ? result.rowsAffected[0] : result.affectedRows
+    if (affectedRows === 0) {
       return res.status(404).json({
         success: false,
         message: '消息不存在'
@@ -163,13 +173,15 @@ router.post('/contact/:id/reply', async (req, res) => {
 
     const contactData = rows[0]
 
-    // 更新数据库
+    // 更新数据库（SQL Server 使用 GETDATE() 替代 NOW()）
     const [result] = await db.query(
-      'UPDATE contact_messages SET status = ?, reply_message = ?, replied_at = NOW() WHERE id = ?',
+      'UPDATE contact_messages SET status = ?, reply_message = ?, replied_at = GETDATE() WHERE id = ?',
       ['replied', reply_message, id]
     )
 
-    if (result.affectedRows === 0) {
+    // SQL Server 返回 rowsAffected 而不是 affectedRows
+    const affectedRows = result.rowsAffected ? result.rowsAffected[0] : result.affectedRows
+    if (affectedRows === 0) {
       return res.status(404).json({
         success: false,
         message: '消息不存在'

@@ -1,8 +1,8 @@
-import { Router } from 'express'
+import express from 'express'
 import db from '../db.js'
 import { verifyCaptcha } from './captcha.js'
 
-const router = Router()
+const router = express.Router()
 
 // 提交申请试用
 router.post('/trial', verifyCaptcha, async (req, res) => {
@@ -23,7 +23,7 @@ router.post('/trial', verifyCaptcha, async (req, res) => {
 
     res.json({ success: true, message: '申请提交成功，我们将在1-2个工作日内联系您！' })
   } catch (err) {
-    console.error('申请试用错误:', err)
+    console.error('[FORMS] 申请试用错误:', err)
     res.status(500).json({ success: false, message: '提交失败，请稍后重试' })
   }
 })
@@ -47,20 +47,20 @@ router.post('/project', verifyCaptcha, async (req, res) => {
 
     res.json({ success: true, message: '项目报备提交成功！' })
   } catch (err) {
-    console.error('项目报备错误:', err)
+    console.error('[FORMS] 项目报备错误:', err)
     res.status(500).json({ success: false, message: '提交失败，请稍后重试' })
   }
 })
 
-// 获取企业动态列表
+// 获取企业动态列表（SQL Server 使用 TOP 替代 LIMIT）
 router.get('/news', async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, title, summary, category, published_at FROM news ORDER BY published_at DESC LIMIT 20'
+      'SELECT TOP 20 id, title, summary, category, published_at FROM news ORDER BY published_at DESC'
     )
     res.json({ success: true, data: rows })
   } catch (err) {
-    console.error('获取动态错误:', err)
+    console.error('[FORMS] 获取动态错误:', err)
     res.status(500).json({ success: false, message: '获取失败' })
   }
 })
@@ -74,6 +74,7 @@ router.get('/news/:id', async (req, res) => {
     }
     res.json({ success: true, data: rows[0] })
   } catch (err) {
+    console.error('[FORMS] 获取动态详情错误:', err)
     res.status(500).json({ success: false, message: '获取失败' })
   }
 })

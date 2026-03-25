@@ -135,8 +135,16 @@ router.post('/upload', (req, res, next) => {
       [fileName, description || '', fileSize, fileName, storageResult.path, type, req.file.mimetype, user.id]
     )
 
-    if (!result || !result.insertId) {
-      console.error('[UPLOAD] 数据库插入失败：insertId 为空')
+    // SQL Server 返回的 ID 在 result.recordset 中
+    let insertedId = null
+    if (result.recordset && result.recordset[0]) {
+      insertedId = result.recordset[0].id
+    } else if (result.insertId) {
+      insertedId = result.insertId
+    }
+
+    if (!insertedId) {
+      console.error('[UPLOAD] 数据库插入失败：无法获取插入的 ID')
       // 删除已保存的文件
       await storageService.deleteFile(storageResult.path).catch(err => {
         console.error('[UPLOAD] 删除文件失败:', err)
@@ -147,22 +155,22 @@ router.post('/upload', (req, res, next) => {
     // 验证数据库记录是否存在
     const [verify] = await db.query(
       'SELECT id, file_name, file_path FROM download_resources WHERE id = ?',
-      [result.insertId]
+      [insertedId]
     )
     if (!verify || verify.length === 0) {
-      console.error(`[UPLOAD] 数据库验证失败：ID=${result.insertId} 的记录不存在`)
+      console.error(`[UPLOAD] 数据库验证失败：ID=${insertedId} 的记录不存在`)
       await storageService.deleteFile(storageResult.path).catch(err => {
         console.error('[UPLOAD] 删除文件失败:', err)
       })
       return res.status(500).json({ success: false, message: '文件保存失败，验证不通过' })
     }
 
-    console.log(`[UPLOAD] 文件上传成功，ID=${result.insertId}，文件名=${fileName}`)
+    console.log(`[UPLOAD] 文件上传成功，ID=${insertedId}，文件名=${fileName}`)
     res.json({
       success: true,
       message: '上传成功',
       data: {
-        id: result.insertId,
+        id: insertedId,
         originalname: fileName,
         filename: fileName,
         size: req.file.size,
@@ -180,7 +188,7 @@ router.get('/uploads/list', async (req, res) => {
   try {
     const { default: db } = await import('../db.js')
     const [rows] = await db.query(
-      'SELECT id, name, file_name, description, size, type, created_by, created_at, (SELECT username FROM users WHERE id = created_by) AS uploaded_by FROM download_resources ORDER BY created_at DESC'
+      'SELECT dr.id, dr.name, dr.file_name, dr.description, dr.size, dr.type, dr.created_by, dr.created_at, u.username AS uploaded_by FROM download_resources dr LEFT JOIN users u ON dr.created_by = u.id ORDER BY dr.created_at DESC'
     )
     res.json({ success: true, data: rows })
   } catch (error) {
@@ -269,7 +277,9 @@ router.delete('/uploads/:id', async (req, res) => {
       [id]
     )
 
-    if (result.affectedRows === 0) {
+    // SQL Server 返回 rowsAffected 而不是 affectedRows
+    const affectedRows = result.rowsAffected ? result.rowsAffected[0] : result.affectedRows
+    if (affectedRows === 0) {
       return res.status(404).json({ success: false, message: '文件不存在' })
     }
 
