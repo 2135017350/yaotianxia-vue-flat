@@ -473,15 +473,31 @@ function formatFileSize(bytes: number): string {
 }
 
 function getDownloadLink(item: any) {
-  if (item.path) return item.path
+  // 优先使用数据库中存储的路径（已上传的文件）
+  if (item.path) {
+    return item.path
+  }
+  // 默认文件使用静态路径
   return `/downloads/${item.file}`
 }
 
 function downloadFile(item: any) {
+  console.log('[DOWNLOAD] 准备下载文件:', item)
   const link = document.createElement('a')
-  link.href = getDownloadLink(item)
+  const downloadUrl = getDownloadLink(item)
+  console.log('[DOWNLOAD] 下载 URL:', downloadUrl)
+  
+  link.href = downloadUrl
+  // 设置正确的文件名（包含原始扩展名）
   link.download = item.name || item.file || 'download'
+  link.setAttribute('target', '_blank')
+  link.setAttribute('rel', 'noopener noreferrer')
+  
+  document.body.appendChild(link)
   link.click()
+  document.body.removeChild(link)
+  
+  console.log('[DOWNLOAD] 下载请求已发送')
 }
 
 function handleFileSelect(event: Event) {

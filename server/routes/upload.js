@@ -4,24 +4,19 @@ import jwt from 'jsonwebtoken'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import LocalStorageService from '../services/LocalStorageService.js'
-// import S3StorageService from '../services/S3StorageService.js' // 未来可切换到云存储
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yaotianxia_secret'
 const router = express.Router()
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// 初始化存储服务（默认使用本地存储）
-// 如需切换到 S3 兼容存储（阿里云 OSS、腾讯云 COS 等），修改下面一行即可：
-// const storageService = new S3StorageService()
+// 初始化存储服务（本地存储）
 const storageService = new LocalStorageService()
 
 // 内存存储（multer 不写入磁盘，由 storageService 处理）
 const storage = multer.memoryStorage()
 
-// Bug Fix #2: 修复文件类型过滤器，允许更多文件类型
 // 文件过滤（只允许特定类型）
 const fileFilter = (req, file, cb) => {
-  // 支持的文件类型：pdf, doc, docx, xls, xlsx, mp4, avi, mov, rar, zip, exe, apk
   const allowedTypes = /^(pdf|doc|docx|xls|xlsx|mp4|avi|mov|rar|zip|exe|apk)$/i
   const ext = file.originalname.split('.').pop()?.toLowerCase() || ''
   
@@ -58,7 +53,7 @@ function getUserFromToken(req) {
   }
 }
 
-// Bug Fix #2: 添加 multer 错误处理中間件
+// 上传文件接口
 router.post('/upload', (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
@@ -74,18 +69,14 @@ router.post('/upload', (req, res, next) => {
     next()
   })
 }, async (req, res) => {
-  // Bug Fix #2: 增强调试日志，帮助诊断上传失败问题
   console.log('[UPLOAD] ===== 上传请求开始 =====')
-  console.log('[UPLOAD] req.file 的完整结构:', {
+  console.log('[UPLOAD] 文件信息:', {
     fieldname: req.file?.fieldname,
     originalname: req.file?.originalname,
-    encoding: req.file?.encoding,
-    mimetype: req.file?.mimetype,
     size: req.file?.size,
     bufferLength: req.file?.buffer?.length,
   })
-  console.log('[UPLOAD] Authorization 头:', req.headers.authorization ? '存在' : '缺失')
-  console.log('[UPLOAD] req.body:', req.body)
+  
   try {
     const user = getUserFromToken(req)
     if (!user) {
@@ -93,11 +84,11 @@ router.post('/upload', (req, res, next) => {
       return res.status(401).json({ success: false, message: '未授权，请先登录' })
     }
 
-    // 检查用户是否为管理员
     if (!user.role || user.role !== 'admin') {
       console.warn(`[UPLOAD] 用户 ${user.id} 权限不足，role=${user.role}`)
       return res.status(403).json({ success: false, message: '仅管理员可上传文件' })
     }
+
     console.log(`[UPLOAD] 管理员 ${user.id} 开始上传文件`)
 
     if (!req.file) {
@@ -107,7 +98,7 @@ router.post('/upload', (req, res, next) => {
     const { uploadType, description } = req.body
     const type = uploadType === 'video' ? 'video' : 'contract'
     
-    // 修复 multer 中文乱码问题：将 latin1 编码的文件名转换为 UTF-8
+    // 修复 multer 中文乱码问题
     let fileName = req.file.originalname
     try {
       fileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
@@ -135,7 +126,7 @@ router.post('/upload', (req, res, next) => {
 
     console.log(`[UPLOAD] 文件已保存，路径=${storageResult.path}`)
 
-    // 导入 db 模块（需要在使用时导入，避免循环依赖）
+    // 导入 db 模块
     const { default: db } = await import('../db.js')
 
     // 将文件信息存入数据库
@@ -172,9 +163,10 @@ router.post('/upload', (req, res, next) => {
       message: '上传成功',
       data: {
         id: result.insertId,
-        originalname: fileName,  // 前端需要的字段
-        filename: fileName,       // 向后兼容
+        originalname: fileName,
+        filename: fileName,
         size: req.file.size,
+        path: storageResult.path,
       }
     })
   } catch (error) {
@@ -197,11 +189,16 @@ router.get('/uploads/list', async (req, res) => {
   }
 })
 
-// 下载文件
+// 直接下载文件（通过静态路由）
+// 前端应该直接访问 /downloads/文件名，而不是调用 API
+// 这个接口仅作为备选方案
 router.get('/uploads/:id/download', async (req, res) => {
   try {
     const { default: db } = await import('../db.js')
     const id = parseInt(req.params.id, 10)
+    
+    console.log(`[DOWNLOAD] 下载请求，ID=${id}`)
+    
     const [rows] = await db.query(
       'SELECT file_name, file_path FROM download_resources WHERE id = ?',
       [id]
@@ -221,57 +218,35 @@ router.get('/uploads/:id/download', async (req, res) => {
       return res.status(404).json({ success: false, message: '文件已删除或不存在' })
     }
 
-    // Bug Fix #8: 修正路径构建逻辑
-    // file_path = /downloads/1774333596079_filename.pdf
-    // 应该指向 server/public/downloads/1774333596079_filename.pdf
-    // 而不是 server/public/downloads/downloads/1774333596079_filename.pdf
-    // 所以需要从 file_path 中去掉前缀 /downloads
-    const relativePath = file_path.startsWith('/downloads/')
-      ? file_path.slice(10)
-      : file_path
-    const fullPath = path.join(__dirname, '../public/downloads', relativePath)
+    // 获取文件内容
+    const fileBuffer = await storageService.getFileStream(file_path)
 
-    // 设置正确的响应头，确保中文文件名正确显示
+    // 设置正确的响应头
+    res.setHeader('Content-Type', 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file_name)}`)
+    res.setHeader('Content-Length', fileBuffer.length)
 
-    console.log(`[DOWNLOAD] 下载文件，ID=${id}，文件名=${file_name}，数据库路径=${file_path}，物理路径=${fullPath}`)
-
-    // 使用 res.sendFile 下载文件（最稳定的方案）
-    res.sendFile(fullPath, (err) => {
-      if (err) {
-        console.error(`[DOWNLOAD] 下载失败，ID=${id}，错误=${err.message}`)
-        if (!res.headersSent) {
-          res.status(500).json({ success: false, message: '下载失败' })
-        }
-      }
-    })
+    console.log(`[DOWNLOAD] 下载成功，ID=${id}，文件名=${file_name}，大小=${fileBuffer.length} bytes`)
+    res.send(fileBuffer)
   } catch (error) {
     console.error('[DOWNLOAD] 下载错误:', error)
     if (!res.headersSent) {
-      res.status(500).json({ success: false, message: error.message })
+      res.status(500).json({ success: false, message: error.message || '下载失败' })
     }
   }
 })
 
-// 删除文件（仅管理员）
+// 删除文件
 router.delete('/uploads/:id', async (req, res) => {
   try {
-    const tokenUser = getUserFromToken(req)
-    if (!tokenUser) {
-      console.warn('[DELETE] 用户未授权')
-      return res.status(401).json({ success: false, message: '未授权' })
-    }
-
-    // 从 token 中检查 role
-    if (!tokenUser.role || tokenUser.role !== 'admin') {
-      console.warn(`[DELETE] 用户 ${tokenUser.id} 权限不足，role=${tokenUser.role}`)
-      return res.status(403).json({ success: false, message: '仅管理员可删除' })
-    }
-
     const { default: db } = await import('../db.js')
     const id = parseInt(req.params.id, 10)
-    
-    // 先查询文件路径
+
+    const user = getUserFromToken(req)
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '仅管理员可删除文件' })
+    }
+
     const [rows] = await db.query(
       'SELECT file_path FROM download_resources WHERE id = ?',
       [id]
@@ -283,23 +258,23 @@ router.delete('/uploads/:id', async (req, res) => {
 
     const { file_path } = rows[0]
 
+    // 删除物理文件
+    await storageService.deleteFile(file_path).catch(err => {
+      console.warn('[DELETE] 删除物理文件失败:', err)
+    })
+
     // 删除数据库记录
-    const [result] = await db.query('DELETE FROM download_resources WHERE id = ?', [id])
+    const [result] = await db.query(
+      'DELETE FROM download_resources WHERE id = ?',
+      [id]
+    )
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: '文件不存在' })
     }
 
-    // 删除存储中的文件
-    try {
-      await storageService.deleteFile(file_path)
-    } catch (err) {
-      console.error(`[DELETE] 删除存储文件失败，ID=${id}:`, err)
-      // 即使删除文件失败，数据库记录已删除，不返回错误
-    }
-
     console.log(`[DELETE] 文件删除成功，ID=${id}`)
-    res.json({ success: true, message: '删除成功' })
+    res.json({ success: true, message: '文件删除成功' })
   } catch (error) {
     console.error('[DELETE] 删除错误:', error)
     res.status(500).json({ success: false, message: error.message })
