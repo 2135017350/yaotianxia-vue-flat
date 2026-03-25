@@ -1,115 +1,85 @@
--- 药天下科技官网数据库初始化脚本（SQL Server 版本）
--- 优化点：1. 自动创建数据库 2. 强制保证建表→插入的执行顺序 3. 增加执行容错
+-- 药天下数据库初始化脚本（MySQL 版本）
 
--- 1. 删除旧数据库（如果存在）
-IF DB_ID('yaotianxia') IS NOT NULL
-  DROP DATABASE yaotianxia;
+-- 删除已存在的数据库
+DROP DATABASE IF EXISTS `yaotianxia`;
 
--- 2. 创建数据库
-CREATE DATABASE yaotianxia;
+-- 创建数据库
+CREATE DATABASE `yaotianxia` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `yaotianxia`;
 
--- 3. 切换到目标数据库
-USE yaotianxia;
+-- 用户表
+CREATE TABLE `users` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `username` VARCHAR(50) UNIQUE NOT NULL COMMENT '用户名',
+  `email` VARCHAR(100) UNIQUE NOT NULL COMMENT '邮箱',
+  `password` VARCHAR(255) NOT NULL COMMENT '密码哈希',
+  `phone` VARCHAR(20) COMMENT '电话',
+  `role` ENUM('admin', 'user') DEFAULT 'user' COMMENT '角色',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
--- 4. 用户表
-CREATE TABLE users (
-  id INT PRIMARY KEY IDENTITY(1,1),
-  username VARCHAR(50) UNIQUE NOT NULL,
-  email VARCHAR(100) UNIQUE,
-  phone VARCHAR(20) UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  register_type VARCHAR(20) DEFAULT 'email' CHECK (register_type IN ('email', 'phone', 'wechat')),
-  wechat_openid VARCHAR(100) UNIQUE,
-  is_verified BIT DEFAULT 0,
-  last_login DATETIME NULL,
-  created_at DATETIME DEFAULT GETDATE(),
-  role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
-  updated_at DATETIME DEFAULT GETDATE()
-);
+-- 下载资源表
+CREATE TABLE `download_resources` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL COMMENT '资源名称',
+  `description` TEXT COMMENT '资源描述',
+  `size` VARCHAR(50) COMMENT '文件大小',
+  `file_name` VARCHAR(255) NOT NULL COMMENT '文件名',
+  `file_path` VARCHAR(500) NOT NULL COMMENT '文件路径（相对于 /downloads）',
+  `type` ENUM('contract', 'video') DEFAULT 'contract' COMMENT '资源类型',
+  `media_type` VARCHAR(100) COMMENT 'MIME 类型',
+  `created_by` INT COMMENT '上传者 ID',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='下载资源表';
 
--- 5. 插入管理员账号
-INSERT INTO users (username, email, password_hash, register_type, role)
-VALUES (
-  'admin', 
-  'admin@yaotianxia.com', 
-  '$2b$10$gq6k7ExL/0xT6d4StJrWaOsLjgiDhwCSKUGt39vbkBqsdYlebs2Dm', 
-  'email', 
-  'admin'
-);
+-- 联系信息表
+CREATE TABLE `contact_messages` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL COMMENT '姓名',
+  `email` VARCHAR(100) NOT NULL COMMENT '邮箱',
+  `phone` VARCHAR(20) COMMENT '电话',
+  `company` VARCHAR(100) COMMENT '公司',
+  `subject` VARCHAR(255) NOT NULL COMMENT '主题',
+  `message` LONGTEXT NOT NULL COMMENT '留言内容',
+  `status` ENUM('unread', 'read', 'replied') DEFAULT 'unread' COMMENT '状态',
+  `reply_message` LONGTEXT COMMENT '回复内容',
+  `replied_at` TIMESTAMP NULL COMMENT '回复时间',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='联系信息表';
 
--- 6. 文档下载资源表（依赖users表，需在users表后创建）
-CREATE TABLE download_resources (
-  id INT PRIMARY KEY IDENTITY(1,1),
-  name VARCHAR(500) NOT NULL,
-  description TEXT,
-  size VARCHAR(50),
-  file_name VARCHAR(500) NOT NULL,
-  file_path VARCHAR(500) NOT NULL,
-  type VARCHAR(50) DEFAULT 'other' CHECK (type IN ('contract', 'video', 'other')),
-  media_type VARCHAR(100) DEFAULT 'application/octet-stream',
-  created_by INT,
-  created_at DATETIME DEFAULT GETDATE(),
-  FOREIGN KEY (created_by) REFERENCES users(id)
-);
+-- 表单提交记录表
+CREATE TABLE `form_submissions` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `form_type` VARCHAR(50) NOT NULL COMMENT '表单类型（如 trial_apply, project_report）',
+  `name` VARCHAR(100) NOT NULL COMMENT '姓名',
+  `email` VARCHAR(100) NOT NULL COMMENT '邮箱',
+  `phone` VARCHAR(20) COMMENT '电话',
+  `company` VARCHAR(100) COMMENT '公司',
+  `content` LONGTEXT COMMENT '表单内容',
+  `status` ENUM('pending', 'processing', 'completed') DEFAULT 'pending' COMMENT '状态',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='表单提交记录表';
 
--- 7. 申请试用表
-CREATE TABLE trial_applications (
-  id INT PRIMARY KEY IDENTITY(1,1),
-  company_name VARCHAR(200) NOT NULL,
-  contact_name VARCHAR(50) NOT NULL,
-  contact_phone VARCHAR(20) NOT NULL,
-  province VARCHAR(50),
-  city VARCHAR(50),
-  district VARCHAR(50),
-  products NVARCHAR(MAX),
-  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  created_at DATETIME DEFAULT GETDATE()
-);
+-- 创建索引
+CREATE INDEX `idx_users_email` ON `users` (`email`);
+CREATE INDEX `idx_users_role` ON `users` (`role`);
+CREATE INDEX `idx_download_resources_created_by` ON `download_resources` (`created_by`);
+CREATE INDEX `idx_download_resources_created_at` ON `download_resources` (`created_at`);
+CREATE INDEX `idx_contact_messages_status` ON `contact_messages` (`status`);
+CREATE INDEX `idx_contact_messages_created_at` ON `contact_messages` (`created_at`);
+CREATE INDEX `idx_form_submissions_form_type` ON `form_submissions` (`form_type`);
+CREATE INDEX `idx_form_submissions_created_at` ON `form_submissions` (`created_at`);
 
--- 8. 项目报备表
-CREATE TABLE project_reports (
-  id INT PRIMARY KEY IDENTITY(1,1),
-  customer_name VARCHAR(200) NOT NULL,
-  project_requirements TEXT,
-  contact_name VARCHAR(50) NOT NULL,
-  contact_phone VARCHAR(20) NOT NULL,
-  partner_code VARCHAR(50),
-  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  created_at DATETIME DEFAULT GETDATE()
-);
+-- 插入默认管理员用户（密码：admin123，已使用 bcrypt 加密）
+-- 使用 bcryptjs 生成的哈希值：$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36jbMv9a
+INSERT INTO `users` (`username`, `email`, `password`, `role`) VALUES 
+('admin', 'admin@yaotianxia.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36jbMv9a', 'admin');
 
--- 9. 企业动态表
-CREATE TABLE news (
-  id INT PRIMARY KEY IDENTITY(1,1),
-  title VARCHAR(200) NOT NULL,
-  summary TEXT,
-  content NVARCHAR(MAX),
-  cover_image VARCHAR(500),
-  category VARCHAR(50) DEFAULT '企业动态',
-  published_at DATETIME DEFAULT GETDATE(),
-  created_at DATETIME DEFAULT GETDATE()
-);
-
--- 10. 联系我们表
-CREATE TABLE contact_messages (
-  id INT PRIMARY KEY IDENTITY(1,1),
-  name VARCHAR(100) NOT NULL,
-  email VARCHAR(100) NOT NULL,
-  phone VARCHAR(20),
-  company VARCHAR(200),
-  subject VARCHAR(200) NOT NULL,
-  message NVARCHAR(MAX) NOT NULL,
-  status VARCHAR(20) DEFAULT 'unread' CHECK (status IN ('unread', 'read', 'replied')),
-  created_at DATETIME DEFAULT GETDATE(),
-  replied_at DATETIME NULL,
-  reply_message NVARCHAR(MAX)
-);
-
--- 11. 插入示例企业动态
-INSERT INTO news (title, summary, category, published_at) VALUES
-('药天下科技荣获2024年度医药行业优秀软件奖', '北京药天下科技有限公司凭借在医药管理软件领域14年的深耕，荣获2024年度医药行业优秀软件奖。', '企业动态', '2024-12-15 10:00:00'),
-('药天下ERP+WMS系统完成重大版本升级', '药天下ERP+WMS系统发布6.0版本，新增AI智能预警、云端数据同步等核心功能，全面提升医药企业数字化管理效率。', '产品动态', '2024-11-20 09:00:00'),
-('深度HIS医院管理系统成功落地全国50家医疗机构', '深度HIS系统凭借稳定性高、功能全面的优势，已成功为全国50家医疗机构提供数字化管理服务。', '企业动态', '2024-10-10 14:00:00');
-
--- 执行完成提示
-PRINT '数据库初始化完成！';
+-- 插入示例下载资源
+INSERT INTO `download_resources` (`name`, `description`, `size`, `file_name`, `file_path`, `type`, `created_by`) VALUES 
+('示例合同', '这是一份示例合同文件', '100KB', 'sample_contract.pdf', '/downloads/sample_contract.pdf', 'contract', 1);

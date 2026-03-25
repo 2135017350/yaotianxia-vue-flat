@@ -31,25 +31,16 @@ router.post('/contact', async (req, res) => {
     // 导入数据库模块
     const { default: db } = await import('../db.js')
 
-    // 插入数据库（使用 OUTPUT 子句获取插入的 ID）
+    // 插入数据库
     console.log('[CONTACT] 准备插入数据库...')
     const [result] = await db.query(
-      `INSERT INTO contact_messages (name, email, phone, company, subject, message, status) 
-       OUTPUT INSERTED.id 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      'INSERT INTO contact_messages (name, email, phone, company, subject, message, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [name, email, phone || null, company || null, subject, message, 'unread']
     )
     console.log('[CONTACT] 数据库插入结果:', result)
 
-    // 从 OUTPUT 子句获取插入的 ID
-    let contactId = null
-    if (result.recordset && result.recordset[0]) {
-      contactId = result.recordset[0].id
-      console.log(`[CONTACT] 从 OUTPUT 子句获取 ID: ${contactId}`)
-    } else if (result.insertId) {
-      contactId = result.insertId
-      console.log(`[CONTACT] 从 insertId 获取 ID: ${contactId}`)
-    }
+    // MySQL 返回的 insertId
+    const contactId = result.insertId
 
     if (!contactId) {
       console.error('[CONTACT] 数据库插入失败: 无法获取插入的 ID')
@@ -98,9 +89,9 @@ router.get('/contact/messages', async (req, res) => {
   try {
     const { default: db } = await import('../db.js')
 
-    // SQL Server 使用 TOP 替代 LIMIT
+    // MySQL 使用 LIMIT
     const [rows] = await db.query(
-      'SELECT TOP 100 id, name, email, phone, company, subject, message, status, created_at FROM contact_messages ORDER BY created_at DESC'
+      'SELECT id, name, email, phone, company, subject, message, status, created_at FROM contact_messages ORDER BY created_at DESC LIMIT 100'
     )
 
     res.json({
@@ -127,9 +118,8 @@ router.put('/contact/:id/read', async (req, res) => {
       ['read', id]
     )
 
-    // SQL Server 返回 rowsAffected 而不是 affectedRows
-    const affectedRows = result.rowsAffected ? result.rowsAffected[0] : result.affectedRows
-    if (affectedRows === 0) {
+    // MySQL 返回 affectedRows
+    if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,
         message: '消息不存在'
@@ -178,15 +168,14 @@ router.post('/contact/:id/reply', async (req, res) => {
 
     const contactData = rows[0]
 
-    // 更新数据库（SQL Server 使用 GETDATE() 替代 NOW()）
+    // 更新数据库
     const [result] = await db.query(
-      'UPDATE contact_messages SET status = ?, reply_message = ?, replied_at = GETDATE() WHERE id = ?',
+      'UPDATE contact_messages SET status = ?, reply_message = ?, replied_at = NOW() WHERE id = ?',
       ['replied', reply_message, id]
     )
 
-    // SQL Server 返回 rowsAffected 而不是 affectedRows
-    const affectedRows = result.rowsAffected ? result.rowsAffected[0] : result.affectedRows
-    if (affectedRows === 0) {
+    // MySQL 返回 affectedRows
+    if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,
         message: '消息不存在'

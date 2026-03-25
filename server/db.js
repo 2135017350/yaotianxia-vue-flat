@@ -1,111 +1,32 @@
-import sql from 'mssql'
+import mysql from 'mysql2/promise'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
-// SQL Server 连接配置
-const config = {
-  server: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT) || 1433,
-  user: process.env.DB_USER || 'sa',
-  password: process.env.DB_PASSWORD || 'YourPassword123',
-  database: process.env.DB_NAME || 'yaotianxia',
-  authentication: {
-    type: 'default',
-    options: {
-      userName: process.env.DB_USER || 'sa',
-      password: process.env.DB_PASSWORD || 'YourPassword123',
-    }
-  },
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true' || false,
-    trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true' || true,
-    enableKeepAlive: true,
-    keepAliveInitialDelaySeconds: 0,
-  },
-  pool: {
-    min: 0,
-    max: 10,
-  },
-  connectionTimeout: 15000,
-  requestTimeout: 30000,
-}
-
 // 创建连接池
-let pool = null
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '3306', 10),
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'yaotianxia',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelayMs: 0,
+})
 
-async function getPool() {
-  if (pool) {
-    return pool
-  }
+console.log(`[DB] MySQL 连接池已创建: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`)
 
-  try {
-    pool = new sql.ConnectionPool(config)
-    
-    pool.on('error', (err) => {
-      console.error('[DB] 连接池错误:', err)
-      pool = null
-    })
+// 测试连接
+pool.getConnection()
+  .then(conn => {
+    console.log('[DB] MySQL 连接成功！')
+    conn.release()
+  })
+  .catch(err => {
+    console.error('[DB] MySQL 连接失败:', err.message)
+  })
 
-    await pool.connect()
-    console.log('[DB] SQL Server 连接池已创建')
-    return pool
-  } catch (error) {
-    console.error('[DB] SQL Server 连接失败:', error)
-    pool = null
-    throw error
-  }
-}
-
-// 执行查询的包装函数（兼容 MySQL 的 API）
-async function query(sql, params = []) {
-  try {
-    const pool = await getPool()
-    const request = pool.request()
-
-    // 为参数添加绑定
-    if (Array.isArray(params) && params.length > 0) {
-      let paramIndex = 1
-      // 将 ? 替换为 @p1, @p2 等
-      let modifiedSql = sql
-      const paramNames = []
-      
-      for (let i = 0; i < params.length; i++) {
-        const paramName = `@p${paramIndex}`
-        paramNames.push(paramName)
-        request.input(`p${paramIndex}`, params[i])
-        paramIndex++
-      }
-
-      // 替换 SQL 中的 ?
-      for (const paramName of paramNames) {
-        modifiedSql = modifiedSql.replace('?', paramName)
-      }
-
-      const result = await request.query(modifiedSql)
-      return [result.recordset, result]
-    } else {
-      const result = await request.query(sql)
-      return [result.recordset, result]
-    }
-  } catch (error) {
-    console.error('[DB] 查询错误:', error.message)
-    console.error('[DB] SQL:', sql)
-    throw error
-  }
-}
-
-// 关闭连接池
-async function closePool() {
-  if (pool) {
-    await pool.close()
-    pool = null
-    console.log('[DB] 连接池已关闭')
-  }
-}
-
-export default {
-  query,
-  getPool,
-  closePool,
-}
+export default pool

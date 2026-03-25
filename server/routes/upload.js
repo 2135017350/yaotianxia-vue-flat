@@ -129,23 +129,14 @@ router.post('/upload', (req, res, next) => {
     // 导入 db 模块
     const { default: db } = await import('../db.js')
 
-    // 将文件信息存入数据库（使用 OUTPUT 子句获取插入的 ID）
+    // 将文件信息存入数据库
     const [result] = await db.query(
-      `INSERT INTO download_resources (name, description, size, file_name, file_path, type, media_type, created_by) 
-       OUTPUT INSERTED.id 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      'INSERT INTO download_resources (name, description, size, file_name, file_path, type, media_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [fileName, description || '', fileSize, fileName, storageResult.path, type, req.file.mimetype, user.id]
     )
 
-    // 从 OUTPUT 子句获取插入的 ID
-    let insertedId = null
-    if (result.recordset && result.recordset[0]) {
-      insertedId = result.recordset[0].id
-      console.log(`[UPLOAD] 从 OUTPUT 子句获取 ID: ${insertedId}`)
-    } else if (result.insertId) {
-      insertedId = result.insertId
-      console.log(`[UPLOAD] 从 insertId 获取 ID: ${insertedId}`)
-    }
+    // MySQL 返回的 insertId 在 result.insertId 中
+    const insertedId = result.insertId
 
     if (!insertedId) {
       console.error('[UPLOAD] 数据库插入失败：无法获取插入的 ID')
@@ -282,9 +273,8 @@ router.delete('/uploads/:id', async (req, res) => {
       [id]
     )
 
-    // SQL Server 返回 rowsAffected 而不是 affectedRows
-    const affectedRows = result.rowsAffected ? result.rowsAffected[0] : result.affectedRows
-    if (affectedRows === 0) {
+    // MySQL 返回 affectedRows
+    if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: '文件不存在' })
     }
 
