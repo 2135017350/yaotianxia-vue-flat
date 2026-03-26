@@ -66,8 +66,8 @@ router.post('/register', async (req, res) => {
     }
 
     const [result] = await db.query(sql, params)
-    // SQL Server 返回的 insertId 在 result.recordset 中
-    const userId = result.recordset && result.recordset[0] ? result.recordset[0].id : result.insertId
+    // SQL Server 通过 OUTPUT INSERTED.id 返回自增主键
+    const userId = result.insertId
 
     const token = generateToken({ id: userId, email: email || null, phone: phone || null })
     res.json({
@@ -102,13 +102,13 @@ router.post('/login', async (req, res) => {
     let rows
     if (account.includes('@')) {
       // 邮箱登录
-      [rows] = await db.query('SELECT * FROM users WHERE email = ?', [account])
+      ;[rows] = await db.query('SELECT * FROM users WHERE email = ?', [account])
     } else if (/^1[3-9]\d{9}$/.test(account)) {
       // 手机号登录
-      [rows] = await db.query('SELECT * FROM users WHERE phone = ?', [account])
+      ;[rows] = await db.query('SELECT * FROM users WHERE phone = ?', [account])
     } else {
       // 用户名登录
-      [rows] = await db.query('SELECT * FROM users WHERE username = ?', [account])
+      ;[rows] = await db.query('SELECT * FROM users WHERE username = ?', [account])
     }
 
     if (!rows || rows.length === 0) {

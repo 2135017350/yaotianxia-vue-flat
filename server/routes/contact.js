@@ -31,7 +31,7 @@ router.post('/contact', async (req, res) => {
     // 导入数据库模块
     const { default: db } = await import('../db.js')
 
-    // 插入数据库
+    // 插入数据库（SQL Server 通过 OUTPUT INSERTED.id 返回自增主键）
     console.log('[CONTACT] 准备插入数据库...')
     const [result] = await db.query(
       'INSERT INTO contact_messages (name, email, phone, company, subject, message, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -39,7 +39,7 @@ router.post('/contact', async (req, res) => {
     )
     console.log('[CONTACT] 数据库插入结果:', result)
 
-    // MySQL 返回的 insertId
+    // SQL Server 通过 OUTPUT INSERTED.id 返回自增主键
     const contactId = result.insertId
 
     if (!contactId) {
@@ -54,7 +54,6 @@ router.post('/contact', async (req, res) => {
     console.log(`[CONTACT] 新的联系信息，ID=${contactId}，来自=${name} (${email})`)
 
     // 异步发送邮件通知（不阻塞响应）
-    // 即使邮件发送失败，也已经成功存入数据库，所以返回成功
     MailService.sendContactNotification({
       id: contactId,
       name,
@@ -85,13 +84,13 @@ router.post('/contact', async (req, res) => {
 })
 
 // 获取联系信息列表（仅管理员）
+// SQL Server 使用 TOP N 替代 LIMIT N
 router.get('/contact/messages', async (req, res) => {
   try {
     const { default: db } = await import('../db.js')
 
-    // MySQL 使用 LIMIT
     const [rows] = await db.query(
-      'SELECT id, name, email, phone, company, subject, message, status, created_at FROM contact_messages ORDER BY created_at DESC LIMIT 100'
+      'SELECT TOP 100 id, name, email, phone, company, subject, message, status, created_at FROM contact_messages ORDER BY created_at DESC'
     )
 
     res.json({
@@ -118,7 +117,7 @@ router.put('/contact/:id/read', async (req, res) => {
       ['read', id]
     )
 
-    // MySQL 返回 affectedRows
+    // SQL Server 通过 rowsAffected 返回受影响行数
     if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,
@@ -168,13 +167,13 @@ router.post('/contact/:id/reply', async (req, res) => {
 
     const contactData = rows[0]
 
-    // 更新数据库
+    // 更新数据库（SQL Server 使用 GETDATE() 替代 NOW()）
     const [result] = await db.query(
-      'UPDATE contact_messages SET status = ?, reply_message = ?, replied_at = NOW() WHERE id = ?',
+      'UPDATE contact_messages SET status = ?, reply_message = ?, replied_at = GETDATE() WHERE id = ?',
       ['replied', reply_message, id]
     )
 
-    // MySQL 返回 affectedRows
+    // SQL Server 通过 rowsAffected 返回受影响行数
     if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,

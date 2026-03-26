@@ -52,7 +52,7 @@ router.post('/project', verifyCaptcha, async (req, res) => {
   }
 })
 
-// 获取企业动态列表（SQL Server 使用 TOP 替代 LIMIT）
+// 获取企业动态列表（SQL Server 使用 TOP N 替代 LIMIT N）
 router.get('/news', async (req, res) => {
   try {
     const [rows] = await db.query(

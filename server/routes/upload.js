@@ -129,13 +129,13 @@ router.post('/upload', (req, res, next) => {
     // 导入 db 模块
     const { default: db } = await import('../db.js')
 
-    // 将文件信息存入数据库
+    // 将文件信息存入数据库（SQL Server 通过 OUTPUT INSERTED.id 返回自增主键）
     const [result] = await db.query(
       'INSERT INTO download_resources (name, description, size, file_name, file_path, type, media_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [fileName, description || '', fileSize, fileName, storageResult.path, type, req.file.mimetype, user.id]
     )
 
-    // MySQL 返回的 insertId 在 result.insertId 中
+    // SQL Server 通过 OUTPUT INSERTED.id 返回自增主键
     const insertedId = result.insertId
 
     if (!insertedId) {
@@ -273,7 +273,7 @@ router.delete('/uploads/:id', async (req, res) => {
       [id]
     )
 
-    // MySQL 返回 affectedRows
+    // SQL Server 通过 rowsAffected 返回受影响行数
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: '文件不存在' })
     }
